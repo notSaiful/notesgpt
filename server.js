@@ -1080,6 +1080,142 @@ Output only the dialogue, nothing else.`;
   }
 });
 
+// ── API route: generate music (Sonauto) ──────────────────────
+const SONAUTO_KEY = process.env.SONAUTO_API_KEY || "";
+const SONAUTO_BASE = "https://api.sonauto.ai/v1";
+
+app.post("/api/generate-music", async (req, res) => {
+  try {
+    const { classNum, subject, chapter, keyPoints, performanceLevel } = req.body;
+
+    if (!chapter) {
+      return res.status(400).json({ error: "Chapter is required." });
+    }
+
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
+    if (!SONAUTO_KEY) return res.status(500).json({ error: "Sonauto API key not configured." });
+
+    // ── Step 1: Generate lyrics via OpenRouter ──
+    const level = performanceLevel || "medium";
+    const mood = level === "high" ? "celebratory, upbeat, victorious" :
+                 level === "low"  ? "motivational, encouraging, comeback" :
+                                    "focused, steady, educational";
+
+    const points = keyPoints || chapter;
+    const systemMsg = "You are a creative songwriter who writes catchy educational songs. Output ONLY the song lyrics, nothing else.";
+    const lyricsPrompt = `Create a short educational song for a CBSE Class ${classNum || 10} student.
+
+Subject: ${subject || "General"}
+Chapter: ${chapter}
+
+Key points to cover:
+${typeof points === "string" ? points : JSON.stringify(points)}
+
+Requirements:
+- Keep it short (max 1-2 minutes when sung)
+- Make it extremely catchy and easy to remember
+- Include important formulas, definitions, or concepts
+- Use simple language a student would enjoy
+- The mood should be: ${mood}
+- Make it rhythmic and fun to sing along
+- Add a chorus that repeats key concepts
+
+Output song lyrics only. No titles, no instructions, no brackets.`;
+
+    const lyrics = await callOpenRouter(apiKey, systemMsg, lyricsPrompt, 1500);
+    if (!lyrics) {
+      return res.status(502).json({ error: "Failed to generate lyrics." });
+    }
+
+    const cleanLyrics = lyrics
+      .replace(/\*\*/g, "").replace(/\*/g, "")
+      .replace(/#/g, "").replace(/\[.*?\]/g, "")
+      .trim();
+
+    console.log(`🎵 Generated lyrics: ${cleanLyrics.split(/\s+/).length} words`);
+
+    // ── Step 2: Style tags based on performance ──
+    const styleTags = level === "high"
+      ? ["pop", "upbeat", "energetic", "happy"]
+      : level === "low"
+      ? ["acoustic", "inspiring", "warm", "motivational"]
+      : ["pop", "chill", "educational", "medium tempo"];
+
+    const styleLabel = level === "high" ? "Victory Anthem" :
+                       level === "low"  ? "Comeback Track" :
+                                          "Study Groove";
+
+    // ── Step 3: Send to Sonauto API ──
+    const genRes = await fetch(`${SONAUTO_BASE}/generations/v3`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SONAUTO_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: `A short catchy educational song about ${chapter} for students. ${mood} vibe.`,
+        lyrics: cleanLyrics,
+        tags: styleTags,
+        instrumental: false,
+      }),
+    });
+
+    const genData = await genRes.json();
+
+    if (!genRes.ok) {
+      console.error("Sonauto gen error:", genData);
+      return res.status(502).json({ error: "Music generation failed: " + (genData.detail || genData.message || "API error") });
+    }
+
+    const taskId = genData.id || genData.task_id;
+    if (!taskId) {
+      return res.status(502).json({ error: "No task ID returned from Sonauto." });
+    }
+
+    console.log(`🎵 Sonauto task started: ${taskId}`);
+
+    // ── Step 4: Poll for completion ──
+    let audioUrl = null;
+    const maxPolls = 60; // max ~2 minutes
+    for (let i = 0; i < maxPolls; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+
+      const statusRes = await fetch(`${SONAUTO_BASE}/generations/status/${taskId}`, {
+        headers: { "Authorization": `Bearer ${SONAUTO_KEY}` },
+      });
+
+      const statusData = await statusRes.json();
+      const status = (statusData.status || "").toUpperCase();
+
+      if (status === "SUCCESS") {
+        const paths = statusData.song_paths || [];
+        audioUrl = paths[0] || null;
+        console.log(`🎵 Sonauto completed! Audio: ${audioUrl}`);
+        break;
+      } else if (status === "FAILURE") {
+        console.error("Sonauto failed:", statusData.error_message);
+        return res.status(502).json({ error: "Music generation failed: " + (statusData.error_message || "Unknown error") });
+      }
+      // else still generating, continue polling
+    }
+
+    if (!audioUrl) {
+      return res.status(504).json({ error: "Music generation timed out. Please try again." });
+    }
+
+    return res.json({
+      audio_url: audioUrl,
+      lyrics: cleanLyrics,
+      style: styleLabel,
+      tags: styleTags,
+    });
+  } catch (err) {
+    console.error("Music generation error:", err);
+    return res.status(500).json({ error: "An unexpected error occurred." });
+  }
+});
+
 // ── Start server ─────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🚀 NotesGPT server running at http://localhost:${PORT}`);

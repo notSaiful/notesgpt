@@ -306,6 +306,38 @@
         </div>
         <p class="audio-char-label" id="audio-char-label" style="display:none;"></p>
       </div>
+
+      <!-- Music Generation (after scores) -->
+      <div class="music-section" id="music-section">
+        <div class="music-header">
+          <h3 class="music-header__title">🎵 Memory Song</h3>
+          <span class="music-style-badge" id="music-style-badge"></span>
+        </div>
+        <button class="btn btn--accent" id="music-gen-btn">🎵 Generate Memory Song</button>
+
+        <div class="music-loading hidden" id="music-loading">
+          <div class="loader__spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;"></div>
+          <p class="music-loading__text">Composing your song…</p>
+          <p class="music-loading__sub">This may take up to a minute</p>
+        </div>
+
+        <div class="music-error hidden" id="music-error">
+          <p class="music-error__msg">Something went wrong.</p>
+          <button class="btn btn--outline btn--sm" id="music-retry-btn">🔄 Retry</button>
+        </div>
+
+        <div class="music-player-wrap hidden" id="music-player-wrap">
+          <audio id="music-audio" preload="auto"></audio>
+          <div class="music-controls">
+            <button class="music-play-btn" id="music-play-btn">▶</button>
+            <div class="music-progress">
+              <div class="music-progress__bar"><div class="music-progress__fill" id="music-progress-fill"></div></div>
+            </div>
+            <span class="music-time" id="music-time">0:00 / 0:00</span>
+          </div>
+          <div class="music-lyrics" id="music-lyrics"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ═══ Step 5: Correction Cards ═══ -->
@@ -442,6 +474,7 @@
   <script src="/js/video.js"></script>
   <script src="/js/mindmap.js"></script>
   <script src="/js/audio.js"></script>
+  <script src="/js/music.js"></script>
   <script src="/js/doubt.js"></script>
 </body>
 </html>

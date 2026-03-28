@@ -1596,6 +1596,147 @@ body {
 }
 
 /* ══════════════════════════════════════════════
+   MUSIC GENERATION
+   ══════════════════════════════════════════════ */
+
+.music-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.music-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.music-header__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.music-style-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--accent);
+  color: var(--accent-light);
+}
+
+.music-loading {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.music-loading__text {
+  font-size: 0.88rem;
+  color: var(--text);
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.music-loading__sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.music-error {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.music-error__msg {
+  font-size: 0.85rem;
+  color: #ef4444;
+  margin-bottom: 10px;
+}
+
+.music-player-wrap {
+  margin-top: 14px;
+}
+
+.music-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+.music-play-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease;
+}
+
+.music-play-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.45);
+}
+
+.music-progress {
+  flex: 1;
+  min-width: 60px;
+}
+
+.music-progress__bar {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.music-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
+.music-time {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-lyrics {
+  margin-top: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.music-lyrics p {
+  font-size: 0.85rem;
+  color: var(--text);
+  line-height: 1.7;
+  margin-bottom: 4px;
+}
+
+/* ══════════════════════════════════════════════
    AUDIO LEARNING
    ══════════════════════════════════════════════ */
 

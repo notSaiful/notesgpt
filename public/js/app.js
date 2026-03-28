@@ -109,6 +109,12 @@ function setGlobalView(view) {
     if (view === "test-results") AudioPlayer.show();
     else AudioPlayer.stop();
   }
+
+  // Show music section with test results
+  if (typeof MusicPlayer !== "undefined") {
+    if (view === "test-results") MusicPlayer.show();
+    else MusicPlayer.hide();
+  }
 }
 
 window.setGlobalView = setGlobalView;
