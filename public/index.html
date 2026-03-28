@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NotesGPT — CBSE Study Notes Generator (Class 6–12)</title>
+  <meta name="description" content="Generate exam-focused CBSE study notes, flashcards, practice questions, and tests instantly with AI. Covers Class 6 to 12." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="bg-glow bg-glow--1"></div>
+  <div class="bg-glow bg-glow--2"></div>
+  <div class="bg-glow bg-glow--3"></div>
+
+  <main class="container">
+    <!-- ── Hero ── -->
+    <header class="hero" id="hero">
+      <div class="logo">
+        <span class="logo__icon">📝</span>
+        <h1 class="logo__text">Notes<span class="accent">GPT</span></h1>
+      </div>
+      <p class="hero__tagline">AI-powered study notes for CBSE Class 6–12 — instant, structured, exam-ready.</p>
+    </header>
+
+    <!-- ═══ Dashboard ═══ -->
+    <section class="card card--dashboard hidden" id="dashboard-section">
+      <h2 class="card__title">📊 Your Progress</h2>
+      <div class="dash-stats" id="dash-stats"></div>
+      <div class="dash-chapters" id="dash-chapters"></div>
+      <div class="dash-tasks" id="dash-tasks"></div>
+
+      <!-- Saved History -->
+      <div class="hist-section" id="hist-section">
+        <div class="hist-header">
+          <h3 class="hist-header__title">📚 Study History</h3>
+          <button class="btn btn--outline btn--sm" id="hist-clear-btn">Clear All</button>
+        </div>
+        <div class="hist-list" id="hist-list"></div>
+      </div>
+
+      <button class="btn btn--primary dash-new-btn" id="dash-new-btn">+ Study New Chapter</button>
+    </section>
+
+    <!-- ═══ Step 0: Input ═══ -->
+    <section class="card card--input" id="input-section">
+      <h2 class="card__title">Generate Your Notes</h2>
+      <form id="notes-form" autocomplete="off">
+        <div class="form-row">
+          <div class="form-group form-group--half">
+            <label for="class-select">Class</label>
+            <select id="class-select" required>
+              <option value="" disabled selected>Select class</option>
+              <option value="6">Class 6</option><option value="7">Class 7</option>
+              <option value="8">Class 8</option><option value="9">Class 9</option>
+              <option value="10">Class 10</option><option value="11">Class 11</option>
+              <option value="12">Class 12</option>
+            </select>
+          </div>
+          <div class="form-group form-group--half">
+            <label for="subject-select">Subject</label>
+            <select id="subject-select" required disabled>
+              <option value="" disabled selected>Select class first</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="chapter-input">Chapter Name</label>
+          <input type="text" id="chapter-input" placeholder="e.g. Real Numbers, Chemical Reactions..." required />
+        </div>
+        <button type="submit" id="submit-btn" class="btn btn--primary">
+          <span class="btn__text">Generate Notes</span>
+          <span class="btn__icon">→</span>
+        </button>
+      </form>
+      <p class="error-msg" id="error-msg"></p>
+    </section>
+
+    <!-- ═══ Loading (Notes) ═══ -->
+    <section class="card card--loading hidden" id="loading-section">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Generating notes<span class="dots"></span></p>
+        <p class="loader__sub">This may take a few seconds…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 1: Notes Output ═══ -->
+    <section class="card card--output hidden" id="output-section">
+      <div class="output__header">
+        <div>
+          <span class="output__badge" id="output-badge"></span>
+          <h2 class="output__title" id="output-title"></h2>
+        </div>
+        <button class="btn btn--secondary" id="new-notes-btn">+ New Notes</button>
+      </div>
+      <div class="notes-content" id="notes-content"></div>
+      <div class="output__actions">
+        <button class="btn btn--accent" id="mindmap-btn">🗺️ View Chapter Mind Map</button>
+        <button class="btn btn--secondary" id="flashcard-btn">🔒 Lock Memory → Flashcards</button>
+      </div>
+    </section>
+
+    <!-- ═══ Loading (Mind Map) ═══ -->
+    <section class="card card--loading hidden" id="mindmap-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Generating mind map<span class="dots"></span></p>
+        <p class="loader__sub">Mapping chapter structure…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Mind Map View ═══ -->
+    <section class="card card--mindmap hidden" id="mindmap-section">
+      <div class="mm-header">
+        <h2 class="mm-header__title" id="mindmap-title">Chapter Map</h2>
+        <div class="mm-header__actions">
+          <button class="btn btn--outline btn--sm" id="mindmap-dl-png">🖼️ PNG</button>
+          <button class="btn btn--outline btn--sm" id="mindmap-dl-pdf">📄 PDF</button>
+        </div>
+      </div>
+      <div class="mm-canvas" id="mindmap-canvas"></div>
+      <button class="btn btn--accent" id="mindmap-back-btn">Continue → Flashcards 🔒</button>
+    </section>
+
+    <!-- ═══ Loading (Flashcards) ═══ -->
+    <section class="card card--loading hidden" id="flashcard-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Generating flashcards<span class="dots"></span></p>
+        <p class="loader__sub">Creating exam-focused memory cards…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 2: Flashcard Screen ═══ -->
+    <section class="card card--flashcards hidden" id="flashcard-section">
+      <div class="fc-progress">
+        <div class="fc-progress__bar"><div class="fc-progress__fill" id="fc-progress-fill"></div></div>
+        <span class="fc-progress__text" id="fc-progress-text">Card 1 / 20</span>
+      </div>
+      <div class="fc-card" id="fc-card">
+        <div class="fc-card__type" id="fc-card-type">concept</div>
+        <div class="fc-card__question" id="fc-card-question"></div>
+        <div class="fc-card__divider hidden" id="fc-card-divider"></div>
+        <div class="fc-card__answer hidden" id="fc-card-answer"></div>
+      </div>
+      <button class="btn btn--primary fc-show-btn" id="fc-show-btn">Show Answer</button>
+      <div class="fc-rating hidden" id="fc-rating">
+        <button class="fc-rating__btn fc-rating__btn--no" id="fc-rate-no"><span class="fc-rating__icon">❌</span><span>Didn't Know</span></button>
+        <button class="fc-rating__btn fc-rating__btn--partial" id="fc-rate-partial"><span class="fc-rating__icon">⚠️</span><span>Partial</span></button>
+        <button class="fc-rating__btn fc-rating__btn--yes" id="fc-rate-yes"><span class="fc-rating__icon">✅</span><span>Knew It</span></button>
+      </div>
+    </section>
+
+    <!-- ═══ Step 2: Flashcard Complete ═══ -->
+    <section class="card card--complete hidden" id="flashcard-complete">
+      <div class="complete">
+        <div class="complete__icon">🔐</div>
+        <h2 class="complete__title">Memory Locked!</h2>
+        <p class="complete__sub">You've reviewed all flashcards for this chapter.</p>
+        <div class="complete__stats" id="complete-stats"></div>
+        <div class="complete__actions">
+          <button class="btn btn--accent" id="fc-practice-btn">📋 Apply What You Learned → Practice</button>
+          <button class="btn btn--secondary" id="fc-new-notes-btn">📝 New Notes</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Loading (Practice) ═══ -->
+    <section class="card card--loading hidden" id="practice-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Generating questions<span class="dots"></span></p>
+        <p class="loader__sub">Creating CBSE exam-style practice…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 3: Practice Screen ═══ -->
+    <section class="card card--practice hidden" id="practice-section">
+      <div class="pq-progress">
+        <div class="pq-progress__bar"><div class="pq-progress__fill" id="pq-progress-fill"></div></div>
+        <span class="pq-progress__text" id="pq-progress-text">Question 1 / 10</span>
+      </div>
+      <div class="pq-question" id="pq-question">
+        <div class="pq-question__meta">
+          <span class="pq-question__type" id="pq-type">SHORT</span>
+          <span class="pq-question__diff" id="pq-diff">Medium</span>
+        </div>
+        <div class="pq-question__text" id="pq-text"></div>
+      </div>
+      <div class="pq-actions" id="pq-actions">
+        <button class="btn btn--primary" id="pq-show-solution-btn">Show Solution</button>
+        <button class="btn btn--outline" id="pq-attempt-btn">✍️ Attempt First</button>
+      </div>
+      <div class="pq-attempt hidden" id="pq-attempt">
+        <label class="pq-attempt__label">Your Answer:</label>
+        <textarea class="pq-attempt__input" id="pq-attempt-input" rows="4" placeholder="Type your answer here…"></textarea>
+        <button class="btn btn--primary" id="pq-submit-attempt-btn">Done — Show Solution</button>
+      </div>
+      <div class="pq-solution hidden" id="pq-solution">
+        <h3 class="pq-solution__title">📘 Step-by-Step Solution</h3>
+        <ol class="pq-solution__steps" id="pq-solution-steps"></ol>
+        <div class="pq-solution__answer"><strong>Final Answer:</strong> <span id="pq-final-answer"></span></div>
+        <div class="pq-solution__tip" id="pq-marks-tip"></div>
+        <button class="btn btn--primary pq-next-btn" id="pq-next-btn">Next Question →</button>
+      </div>
+    </section>
+
+    <!-- ═══ Step 3: Practice Complete ═══ -->
+    <section class="card card--complete hidden" id="practice-complete">
+      <div class="complete">
+        <div class="complete__icon">🏆</div>
+        <h2 class="complete__title">Practice Complete!</h2>
+        <p class="complete__sub">You've worked through all exam-style questions.</p>
+        <div class="complete__stats" id="practice-stats"></div>
+        <div class="complete__actions">
+          <button class="btn btn--accent" id="pq-test-btn">📝 Test Yourself →</button>
+          <button class="btn btn--secondary" id="pq-new-notes-btn">📝 New Notes</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Loading (Test) ═══ -->
+    <section class="card card--loading hidden" id="test-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Generating test<span class="dots"></span></p>
+        <p class="loader__sub">Preparing CBSE exam simulation…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 4: Test Screen ═══ -->
+    <section class="card card--test hidden" id="test-section">
+      <div class="test-header">
+        <div class="test-progress">
+          <div class="test-progress__bar"><div class="test-progress__fill" id="test-progress-fill"></div></div>
+          <span class="test-progress__text" id="test-progress-text">Q1 / 8</span>
+        </div>
+        <span class="test-marks-info" id="test-marks-info">3 marks</span>
+      </div>
+      <div class="test-q">
+        <span class="test-q__type" id="test-q-type">SHORT</span>
+        <div class="test-q__text" id="test-q-text"></div>
+      </div>
+      <div class="test-answer">
+        <label class="test-answer__label">Your Answer</label>
+        <textarea class="test-answer__input" id="test-answer-input" rows="4" placeholder="Type your answer…"></textarea>
+      </div>
+      <button class="btn btn--primary test-next-btn" id="test-next-btn">Next Question →</button>
+    </section>
+
+    <!-- ═══ Loading (Evaluation) ═══ -->
+    <section class="card card--loading hidden" id="test-eval-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Evaluating answers<span class="dots"></span></p>
+        <p class="loader__sub">AI is grading your test…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 4: Results Screen ═══ -->
+    <section class="hidden" id="test-results">
+      <div class="card card--results">
+        <div class="test-score">
+          <div class="test-score__circle">
+            <span class="test-score__big" id="test-score-big">0</span>
+            <span class="test-score__total" id="test-score-total">/ 25</span>
+          </div>
+          <div class="test-score__accuracy">
+            <span class="test-score__accuracy-label">Accuracy</span>
+            <span class="test-score__accuracy-value" id="test-accuracy">0%</span>
+            <div class="test-score__accuracy-bar"><div class="test-score__accuracy-fill" id="test-accuracy-bar"></div></div>
+          </div>
+        </div>
+      </div>
+      <div id="test-weak-areas" class="test-weak"></div>
+      <div class="test-breakdown" id="test-breakdown"></div>
+      <div class="card card--complete">
+        <div class="complete">
+          <div class="complete__actions">
+            <button class="btn btn--accent btn--lg" id="test-fix-btn">🔧 Fix Mistakes & Practice Weak Points →</button>
+            <button class="btn btn--outline" id="test-video-btn">🎬 Watch Video Help</button>
+            <button class="btn btn--secondary" id="test-retry-btn">🔄 Review & Retry</button>
+            <button class="btn btn--secondary" id="test-new-notes-btn">📝 New Notes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audio Learning (after scores) -->
+      <div class="audio-section hidden" id="audio-section">
+        <div class="audio-header">
+          <h3 class="audio-header__title">🎧 Audio Revision</h3>
+          <div class="audio-modes">
+            <button class="btn btn--accent btn--sm" id="audio-quick-btn">🎧 Quick Listen</button>
+            <button class="btn btn--outline btn--sm" id="audio-podcast-btn">🎙 Podcast Mode</button>
+          </div>
+        </div>
+        <div class="audio-gen-loading hidden" id="audio-gen-loading">
+          <div class="loader__spinner" style="width:20px;height:20px;border-width:2px;margin:0 auto 6px;"></div>
+          <p style="font-size:0.82rem;color:var(--text-muted);text-align:center;">Generating audio script…</p>
+        </div>
+        <div class="audio-player hidden" id="audio-player">
+          <span class="audio-mode-label" id="audio-mode-label">🎧 Quick</span>
+          <button class="audio-play-btn" id="audio-play-btn">▶</button>
+          <div class="audio-progress">
+            <div class="audio-progress__bar"><div class="audio-progress__fill" id="audio-progress-fill"></div></div>
+          </div>
+          <span class="audio-time" id="audio-time">~2 min</span>
+          <button class="audio-speed-btn" id="audio-speed-btn">1x</button>
+        </div>
+        <p class="audio-char-label" id="audio-char-label" style="display:none;"></p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 5: Correction Cards ═══ -->
+    <section class="card hidden" id="correction-section">
+      <div class="corr-header">
+        <h2 class="corr-header__title">🔧 Fix Your Mistakes</h2>
+        <span class="corr-header__count">Mistake <span id="corr-mistake-num">1</span> / <span id="corr-total">3</span></span>
+      </div>
+      <div class="corr-card">
+        <div class="corr-card__question" id="corr-question"></div>
+        <div class="corr-card__row corr-card__row--wrong">
+          <span class="corr-card__label">❌ Your Answer</span>
+          <p class="corr-card__text" id="corr-student-ans"></p>
+        </div>
+        <div class="corr-card__row corr-card__row--right">
+          <span class="corr-card__label">✅ Correct Answer</span>
+          <p class="corr-card__text" id="corr-correct-ans"></p>
+        </div>
+        <div class="corr-card__keypoints">
+          <span class="corr-card__label">📌 Key Points Required</span>
+          <ul id="corr-key-points"></ul>
+        </div>
+        <div class="corr-card__feedback">
+          <span class="corr-card__label">🧠 Feedback</span>
+          <p id="corr-feedback"></p>
+        </div>
+      </div>
+      <button class="btn btn--accent" id="corr-next-btn">Next Mistake →</button>
+    </section>
+
+    <!-- ═══ Loading (Retry) ═══ -->
+    <section class="card card--loading hidden" id="retry-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Generating retry questions<span class="dots"></span></p>
+        <p class="loader__sub">Targeting your weak areas…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 5: Retry Questions ═══ -->
+    <section class="card hidden" id="retry-section">
+      <div class="retry-header">
+        <h2 class="retry-header__title">🔄 Retry — Practice Your Weak Areas</h2>
+        <span class="retry-header__count" id="retry-progress-text">Retry 1 / 3</span>
+      </div>
+      <div class="pq-question">
+        <div class="pq-question__text" id="retry-q-text"></div>
+      </div>
+      <div id="retry-attempt">
+        <label class="pq-attempt__label">Your Answer:</label>
+        <textarea class="pq-attempt__input" id="retry-input" rows="4" placeholder="Try answering this one…"></textarea>
+        <button class="btn btn--primary" id="retry-submit-btn" style="margin-top:12px">Done — Show Solution</button>
+      </div>
+      <div class="pq-solution hidden" id="retry-solution">
+        <h3 class="pq-solution__title">📘 Solution</h3>
+        <ol class="pq-solution__steps" id="retry-steps"></ol>
+        <div class="pq-solution__answer"><strong>Answer:</strong> <span id="retry-answer"></span></div>
+        <button class="btn btn--primary pq-next-btn" id="retry-next-btn">Next Retry →</button>
+      </div>
+    </section>
+
+    <!-- ═══ Step 5: Correction Complete ═══ -->
+    <section class="card card--complete hidden" id="retry-complete">
+      <div class="complete">
+        <div class="complete__icon">💪</div>
+        <h2 class="complete__title">Correction Complete!</h2>
+        <p class="complete__sub">You've reviewed your mistakes and practiced weak areas.</p>
+        <div class="complete__stats" id="retry-stats"></div>
+        <div class="complete__actions">
+          <button class="btn btn--accent" id="retry-dash-btn">📊 Back to Dashboard</button>
+          <button class="btn btn--secondary" id="retry-new-btn">📝 Study New Chapter</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Video Help (shared section) ═══ -->
+    <section class="card card--video hidden" id="video-help-section">
+      <div class="vid-header">
+        <h3 class="vid-header__title">🎬 Video Help</h3>
+        <button class="doubt-modal__close" id="video-close">✕</button>
+      </div>
+      <div class="vid-loading hidden" id="video-loading">
+        <div class="loader__spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;"></div>
+        <p style="font-size:0.85rem;color:var(--text-muted);text-align:center;">Finding best videos…</p>
+      </div>
+      <div class="vid-cards" id="video-cards"></div>
+    </section>
+
+    <footer class="footer">
+      <p>Built with ❤️ for CBSE students &bull; Powered by AI</p>
+    </footer>
+  </main>
+
+  <!-- ═══ Doubt Solver FAB ═══ -->
+  <button class="doubt-fab hidden" id="doubt-fab">
+    <span class="doubt-fab__icon">💡</span>
+    <span class="doubt-fab__text">Ask Doubt</span>
+  </button>
+
+  <!-- ═══ Doubt Solver Modal ═══ -->
+  <div class="doubt-overlay hidden" id="doubt-overlay">
+    <div class="doubt-modal" id="doubt-modal">
+      <div class="doubt-modal__header">
+        <h3 class="doubt-modal__title">💡 Ask a Doubt</h3>
+        <button class="doubt-modal__close" id="doubt-close">✕</button>
+      </div>
+      <p class="doubt-hint" id="doubt-hint">💡 Try solving first, then ask your doubt for the best learning!</p>
+      <div class="doubt-modal__input-wrap">
+        <textarea class="doubt-modal__input" id="doubt-input" rows="4" placeholder="Type your doubt or question here... (e.g., 'Explain the difference between displacement and double displacement reactions')"></textarea>
+        <button class="btn btn--accent doubt-modal__ask" id="doubt-ask-btn">Ask 💡</button>
+      </div>
+      <div class="doubt-loading hidden" id="doubt-loading">
+        <div class="loader__spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;"></div>
+        <p style="font-size:0.85rem;color:var(--text-muted);text-align:center;">Thinking…</p>
+      </div>
+      <div class="doubt-response hidden" id="doubt-response">
+        <div class="doubt-response__body" id="doubt-response-body"></div>
+      </div>
+      <div class="doubt-follow hidden" id="doubt-follow-btns">
+        <button class="btn btn--outline doubt-follow__btn" id="doubt-confused-btn">🤔 Still Confused?</button>
+        <button class="btn btn--outline doubt-follow__btn" id="doubt-example-btn">📖 Another Example</button>
+        <button class="btn btn--outline doubt-follow__btn" id="doubt-video-btn">🎬 Watch Video</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="/js/tracker.js"></script>
+  <script src="/js/history.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/flashcards.js"></script>
+  <script src="/js/practice.js"></script>
+  <script src="/js/test.js"></script>
+  <script src="/js/correction.js"></script>
+  <script src="/js/video.js"></script>
+  <script src="/js/mindmap.js"></script>
+  <script src="/js/audio.js"></script>
+  <script src="/js/doubt.js"></script>
+</body>
+</html>
