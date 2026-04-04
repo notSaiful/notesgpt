@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<body>
+<canvas id="canvas3d" width="400" height="400"></canvas>
+<script type="module">
+import { Application } from 'https://unpkg.com/@splinetool/runtime@latest/build/runtime.js';
+const canvas = document.getElementById('canvas3d');
+const app = new Application(canvas);
+app.load('https://prod.spline.design/oqvARfKFJOMWPoCy/scene.splinecode');
+console.log('Spline loading initiated');
+</script>
+</body>
+</html>

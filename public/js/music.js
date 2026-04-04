@@ -1,12 +1,12 @@
 // ══════════════════════════════════════════════
-// NotesGPT — Music Generation System (Sonauto)
+// NotesGPT — Music Generation System (Bytez suno/bark)
 // ══════════════════════════════════════════════
 
 const MusicPlayer = (() => {
   // ── DOM refs ───────────────────────────────
   const els = {};
   function cacheDom() {
-    els.section = document.getElementById("music-section");
+    els.section = document.getElementById("song-section");
     els.genBtn = document.getElementById("music-gen-btn");
     els.loading = document.getElementById("music-loading");
     els.player = document.getElementById("music-player-wrap");

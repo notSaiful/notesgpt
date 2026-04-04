@@ -41,11 +41,11 @@ const Flashcards = (() => {
   function init() {
     cacheDom();
 
-    els.showBtn.addEventListener("click", revealAnswer);
-    els.rateNo.addEventListener("click", () => rateCard("didnt"));
-    els.ratePartial.addEventListener("click", () => rateCard("partial"));
-    els.rateYes.addEventListener("click", () => rateCard("knew"));
-    els.newNotesBtn.addEventListener("click", () => {
+    if (els.showBtn) els.showBtn.addEventListener("click", revealAnswer);
+    if (els.rateNo) els.rateNo.addEventListener("click", () => rateCard("didnt"));
+    if (els.ratePartial) els.ratePartial.addEventListener("click", () => rateCard("partial"));
+    if (els.rateYes) els.rateYes.addEventListener("click", () => rateCard("knew"));
+    if (els.newNotesBtn) els.newNotesBtn.addEventListener("click", () => {
       if (typeof resetToForm === "function") resetToForm();
     });
   }
@@ -73,6 +73,11 @@ const Flashcards = (() => {
       queuePos = 0;
       results = {};
       knownSet = new Set();
+
+      // Save flashcard data for resume/review
+      if (typeof History !== "undefined") {
+        History.saveContent(sessionClass, sessionSubject, sessionChapter, "flashcards", cards);
+      }
 
       setGlobalView("flashcards");
       showCard();

@@ -1,3 +1,8 @@
 node_modules/
 .env
 .DS_Store
+public/audio/*.wav
+public/audio/*.mp3
+public/videos/*.mp4
+public/videos/*.webm
+*.log

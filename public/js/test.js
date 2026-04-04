@@ -41,31 +41,25 @@ const TestEngine = (() => {
   function init() {
     cacheDom();
 
-    els.nextBtn.addEventListener("click", nextQuestion);
-    els.newNotesBtn.addEventListener("click", () => {
-      if (typeof resetToForm === "function") resetToForm();
-    });
-    els.retryBtn.addEventListener("click", () => {
-      setGlobalView("output");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
+    if (els.nextBtn) els.nextBtn.addEventListener("click", nextQuestion);
+    if (els.newNotesBtn) {
+      els.newNotesBtn.addEventListener("click", () => {
+        if (typeof resetToForm === "function") resetToForm();
+      });
+    }
+    if (els.retryBtn) {
+      els.retryBtn.addEventListener("click", () => {
+        setGlobalView("output");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
 
-    // Fix mistakes button
+    // Fix mistakes button — starts the Correction flow
     const fixBtn = document.getElementById("test-fix-btn");
     if (fixBtn) {
       fixBtn.addEventListener("click", () => {
         if (typeof Correction !== "undefined" && results) {
           Correction.start(sessionClass, sessionSubject, sessionChapter, questions, results, userAnswers);
-        }
-      });
-    }
-
-    // Video help button
-    const videoBtn = document.getElementById("test-video-btn");
-    if (videoBtn) {
-      videoBtn.addEventListener("click", () => {
-        if (typeof VideoHelp !== "undefined") {
-          VideoHelp.show(sessionChapter);
         }
       });
     }

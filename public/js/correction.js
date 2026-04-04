@@ -38,26 +38,18 @@ const Correction = (() => {
     els.retryNextBtn = document.getElementById("retry-next-btn");
     els.retryComplete = document.getElementById("retry-complete");
     els.retryStats = document.getElementById("retry-stats");
-    els.retryDashBtn = document.getElementById("retry-dash-btn");
-    els.retryNewBtn = document.getElementById("retry-new-btn");
   }
 
   // ── Init ───────────────────────────────────
   function init() {
     cacheDom();
 
-    els.corrNextBtn.addEventListener("click", nextMistake);
-    els.retrySubmitBtn.addEventListener("click", () => {
+    if (els.corrNextBtn) els.corrNextBtn.addEventListener("click", nextMistake);
+    if (els.retrySubmitBtn) els.retrySubmitBtn.addEventListener("click", () => {
       retryAttempted++;
       showRetrySolution();
     });
-    els.retryNextBtn.addEventListener("click", nextRetry);
-    els.retryDashBtn.addEventListener("click", () => {
-      if (typeof resetToForm === "function") resetToForm();
-    });
-    els.retryNewBtn.addEventListener("click", () => {
-      if (typeof resetToForm === "function") resetToForm();
-    });
+    if (els.retryNextBtn) els.retryNextBtn.addEventListener("click", nextRetry);
   }
 
   // ── Start correction flow ──────────────────
@@ -86,8 +78,9 @@ const Correction = (() => {
     });
 
     if (mistakes.length === 0) {
-      // No mistakes — skip to dashboard
-      if (typeof resetToForm === "function") resetToForm();
+      // No mistakes — skip directly to Unlock
+      setGlobalView("unlock");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 

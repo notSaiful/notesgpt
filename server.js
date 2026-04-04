@@ -1,6 +1,23 @@
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
+const { pipeline } = require("stream/promises");
+const { Readable } = require("stream");
+const { createClient } = require("@supabase/supabase-js");
+
+// ── Supabase Init ────────────────────────────────────────────
+let supabase = null;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  console.log("🔐 Supabase initialized");
+} else {
+  console.warn("⚠️  Supabase not configured — auth features disabled. Set SUPABASE_URL and SUPABASE_SERVICE_KEY in .env");
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,15 +26,16 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// ── Free models to try (fastest first) ───────────────────────
+// ── Free models to try (best quality + speed first) ─────────
 const FREE_MODELS = [
-  "liquid/lfm-2.5-1.2b-instruct:free",
-  "meta-llama/llama-3.2-3b-instruct:free",
-  "qwen/qwen3-4b:free",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "stepfun/step-3.5-flash:free",
-  "mistralai/mistral-small-3.1-24b-instruct:free",
+  "google/gemini-2.0-flash-001:free",
+  "google/gemma-3-27b-it:free",
+  "qwen/qwen3.6-plus-preview:free",
   "meta-llama/llama-3.3-70b-instruct:free",
+  "nvidia/nemotron-nano-9b-v2:free",
+  "google/gemma-3-4b-it:free",
+  "stepfun/step-3.5-flash:free",
+  "openrouter/free",
 ];
 
 // ── Subject mapping per class ────────────────────────────────
@@ -41,39 +59,69 @@ app.get("/api/subjects/:classNum", (req, res) => {
   res.json({ subjects });
 });
 
-// ── Prompt builders ──────────────────────────────────────────
-function buildNotesPrompt(classNum, subject, chapter) {
-  return `Generate CBSE Class ${classNum} level study notes for the chapter: "${chapter}" in subject: "${subject}".
+// ── Prompt builders (Exam-Cracking Focus) ────────────────────
+function buildNotesPrompt(classNum, subject, chapter, topic) {
+  const isBoard = ["10", "12"].includes(classNum);
+  const examType = isBoard ? "CBSE Board Examination" : `CBSE Class ${classNum} Annual Examination`;
+  const topicLine = topic
+    ? `\nFOCUS SPECIFICALLY on the topic: "${topic}" within this chapter. Cover this topic in depth — explain it thoroughly with examples, formulas, and exam tips. Do not cover the entire chapter, only this specific topic.`
+    : "";
+
+  return `You are an expert CBSE exam preparation tutor for Class ${classNum} ${subject}. Your ONLY goal is to help the student score FULL MARKS in their ${examType}.
+
+Generate study notes for the chapter: "${chapter}" in subject: "${subject}".${topicLine}
+
+CRITICAL INSTRUCTIONS:
+- Base your content STRICTLY on the NCERT textbook for Class ${classNum} ${subject}. Do NOT include anything outside the NCERT syllabus.
+- Prioritize topics and concepts that have appeared REPEATEDLY in previous year CBSE question papers (PYQs) for Class ${classNum}.
+- For Class ${isBoard ? classNum : classNum}, focus on the types of questions that examiners actually ask — definitions, derivations, diagram-based, numerical, and application-based.
+- Highlight which points carry marks in board/annual exams and how to write answers to get full marks.
+- Include "Examiner's Favourite" tags next to points that appear frequently in PYQs.
 
 Format the output strictly as:
 
-## 1. Chapter Overview
-(3-5 lines, simple explanation)
+## 1. ${topic ? `Topic Overview: ${topic}` : "Chapter Overview"}
+(3-5 lines, simple explanation as per NCERT)
 
-## 2. Key Concepts
-(bullet points, exam-focused)
+## 2. Key Concepts (Most Tested in Exams)
+(bullet points — tag each with ⭐ if it appeared in 3+ previous year papers)
 
 ## 3. Important Formulas / Definitions
-(if applicable)
+(if applicable — include EXACT NCERT definitions that examiners expect)
 
-## 4. Most Important Points for Exams
+## 4. Previous Year Exam Patterns
+- List the types of questions asked from this chapter in past ${examType}s
+- Mention which topics get 1-mark, 2-mark, 3-mark, and 5-mark questions
+- Note any "guaranteed" questions that appear almost every year
 
-## 5. Common Mistakes Students Make
+## 5. How to Write Answers for Full Marks
+- Step-by-step answer writing tips specific to this chapter
+- What key points/keywords the examiner looks for
+- Common mistakes students make that cost them marks
 
-## 6. Quick Revision Summary
-(very short)
+## 6. Quick Revision Summary (Last-Minute Exam Prep)
+(10-15 one-liner points — the absolute essentials to revise before walking into the exam hall)
 
-Ensure the difficulty and explanation level matches Class ${classNum} CBSE standards.
-Keep language simple, clear, and optimized for scoring in exams. Avoid unnecessary theory.`;
+Ensure EVERY point directly helps the student score marks in their ${examType}. Remove all filler content. Language must be simple, clear, and Class ${classNum} appropriate.`;
 }
 
 function buildFlashcardPrompt(classNum, subject, chapter) {
-  return `Generate CBSE Class ${classNum} flashcards for the chapter: "${chapter}" in subject: "${subject}".
+  const isBoard = ["10", "12"].includes(classNum);
+  const examType = isBoard ? "CBSE Board Examination" : `CBSE Class ${classNum} Annual Examination`;
+
+  return `You are a CBSE exam preparation expert for Class ${classNum} ${subject}. Generate flashcards for the chapter: "${chapter}" that will help the student score FULL MARKS in their ${examType}.
+
+CRITICAL INSTRUCTIONS:
+- Every flashcard MUST test a concept that is LIKELY TO APPEAR in the ${examType}.
+- Prioritize: NCERT textbook definitions (word-for-word), key formulas, diagram labels, frequently tested concepts from previous year papers.
+- For Class 10/12 Board exams: focus on 1-mark objective questions, important definitions, and formula-based quick recalls.
+- For Class 6-9: focus on chapter-end exercise questions, fill-in-the-blanks, and key terms.
+- Do NOT include obscure or rarely tested content. Every card must be HIGH-YIELD for exam scoring.
 
 Rules:
 - Create 15-25 flashcards
-- Keep them exam-focused
-- Each flashcard must be short and quick to answer (2-5 seconds)
+- Each flashcard must be answerable in 2-5 seconds
+- Answers must be EXACTLY as written in the NCERT textbook (examiners check for NCERT language)
 - No long explanations
 
 Format strictly as a JSON array (no other text, no markdown, just the JSON):
@@ -81,39 +129,52 @@ Format strictly as a JSON array (no other text, no markdown, just the JSON):
 [
   {
     "type": "definition",
-    "question": "Front side question",
-    "answer": "Short, precise answer"
+    "question": "Front side question (as it would appear in exam)",
+    "answer": "Short, precise answer (NCERT-accurate)"
   }
 ]
 
 The "type" field must be one of: "definition", "formula", "concept"
 
-Focus on:
-- Important definitions
-- Key formulas
-- Common exam concepts
-- Frequently tested points
+Focus ONLY on:
+- NCERT definitions that examiners ask word-for-word
+- Formulas that appear in numericals every year
+- Concepts from previous year question papers
+- Diagram labels and key terms frequently tested
+- Chapter-end NCERT exercise answers (these are directly asked in exams)
 
-Keep language simple and optimized for CBSE Class ${classNum} exams.`;
+Keep language simple and optimized for ${examType} scoring.`;
 }
 
 function buildQuestionPrompt(classNum, subject, chapter) {
-  return `Generate CBSE Class ${classNum} exam-style questions for the chapter: "${chapter}" in subject: "${subject}".
+  const isBoard = ["10", "12"].includes(classNum);
+  const examType = isBoard ? "CBSE Board Examination" : `CBSE Class ${classNum} Annual Examination`;
+
+  return `You are a CBSE exam paper setter for Class ${classNum} ${subject}. Generate practice questions for the chapter: "${chapter}" that are MOST LIKELY to appear in the upcoming ${examType}.
+
+CRITICAL INSTRUCTIONS:
+- Model these questions EXACTLY after previous year CBSE question paper patterns for Class ${classNum}.
+- Include questions that have been REPEATED across multiple years — these are "guaranteed" questions.
+- For Board classes (10, 12): Follow the EXACT CBSE marking scheme — 1-mark MCQs, 2-mark short answers (SA-I), 3-mark short answers (SA-II), 5-mark long answers (LA), and case-based questions.
+- For non-board classes (6-9): Follow annual exam patterns — objective, short answer, long answer, and HOTS (Higher Order Thinking Skills).
+- Every question must be solvable using ONLY the NCERT textbook content.
+- Include at least 2 questions that appeared in actual previous year papers (mark them with 🔁 PYQ tag).
 
 Rules:
-- Generate 8-12 questions only (quality over quantity)
-- Mix difficulty: easy, medium, hard
+- Generate 10-15 questions (quality over quantity)
+- Mix difficulty: 30% easy, 40% medium, 30% hard
 - Include:
-  - 2 MCQs (with 4 options each)
-  - 3 short answer (2-3 marks)
-  - 3 long answer (4-5 marks)
-  - 1 case-based question (if applicable)
+  - 3 MCQs (with 4 options each, 1 mark) — modeled after CBSE objective patterns
+  - 2 assertion-reason questions (if applicable for the subject)
+  - 3 short answer (2-3 marks) — the type examiners love to ask
+  - 3 long answer (5 marks) — with sub-parts as CBSE formats them
+  - 2 case-based/competency-based questions (as per new CBSE pattern)
 
 For EACH question, provide:
-- Question text
-- Step-by-step solution
+- Question text (formatted EXACTLY like a real CBSE paper)
+- Step-by-step solution (showing how to write for FULL marks)
 - Final answer
-- Marks tip
+- Marks tip (what keywords/steps the examiner checks to award marks)
 
 Format strictly as a JSON array (no other text, no markdown, just the JSON):
 
@@ -124,32 +185,45 @@ Format strictly as a JSON array (no other text, no markdown, just the JSON):
     "question": "Question text with options A) B) C) D)",
     "solution_steps": ["Step 1...", "Step 2..."],
     "final_answer": "Option and answer",
-    "marks_tip": "How to write for full marks"
+    "marks_tip": "How to write for full marks in the actual exam"
   }
 ]
 
-The "type" field must be one of: "mcq", "short", "long", "case"
+The "type" field must be one of: "mcq", "short", "long", "case", "assertion"
 The "difficulty" field must be one of: "easy", "medium", "hard"
 
-Keep questions aligned with CBSE Class ${classNum} pattern and exam expectations.`;
+Every question must prepare the student for their ACTUAL ${examType}. No random or irrelevant questions.`;
 }
 
 function buildTestPrompt(classNum, subject, chapter) {
-  return `Generate a CBSE Class ${classNum} test for the chapter: "${chapter}" in subject: "${subject}".
+  const isBoard = ["10", "12"].includes(classNum);
+  const examType = isBoard ? "CBSE Board Examination" : `CBSE Class ${classNum} Annual Examination`;
+
+  return `You are a CBSE examiner creating a chapter-wise test for Class ${classNum} ${subject}, chapter: "${chapter}". This test must simulate the EXACT format and difficulty of the real ${examType}.
+
+CRITICAL INSTRUCTIONS:
+- This is a MOCK EXAM. Structure it EXACTLY like a real CBSE question paper section for this chapter.
+- Use the EXACT marking scheme that CBSE follows: 1-mark, 2-mark, 3-mark, 5-mark questions.
+- Questions must be based ONLY on NCERT content and previous year paper patterns.
+- Include at least 2 questions modeled after actual previous year papers.
+- For Board exams: include the new competency-based and case-study format questions.
+- Total marks should be 25-30 (a realistic chapter test).
 
 Rules:
-- Total questions: 8-10
+- Total questions: 10-12
 - Mix of:
-  - 2 MCQs (with 4 options each, 1 mark each)
-  - 3 short answer (2-3 marks each)
-  - 3 long answer (4-5 marks each)
-- Follow CBSE exam pattern strictly
+  - 3 MCQs / Objective (1 mark each) — CBSE board style
+  - 3 short answer SA-I (2 marks each)
+  - 3 short answer SA-II (3 marks each)
+  - 2 long answer (5 marks each) — with sub-parts
+  - 1 case-based question (4 marks) — as per new CBSE format
+- Follow CBSE exam pattern STRICTLY
 
 For each question include:
-- Question text
-- Correct/ideal answer
+- Question text (formatted like a real exam paper)
+- Correct/ideal answer (written the way it should be written in the exam for full marks)
 - Marks for the question
-- Key points required for full marks
+- Key points required for full marks (what the examiner checks)
 
 Format strictly as a JSON array (no other text, no markdown, just the JSON):
 
@@ -157,26 +231,34 @@ Format strictly as a JSON array (no other text, no markdown, just the JSON):
   {
     "type": "mcq",
     "question": "Question with A) B) C) D) options",
-    "answer": "Correct option and answer",
+    "answer": "Correct option and complete answer",
     "marks": 1,
-    "key_points": ["Point 1"]
+    "key_points": ["Exact keyword/point examiner checks"]
   }
 ]
 
-The "type" field must be one of: "mcq", "short", "long"
+The "type" field must be one of: "mcq", "short", "long", "case"
 
-Ensure exam-level quality and clarity for Class ${classNum}.`;
+This test must feel like sitting in the actual ${examType}. Quality and exam-accuracy are paramount.`;
 }
 
 function buildEvalPrompt(classNum, questionsAndAnswers) {
-  return `Evaluate a CBSE Class ${classNum} student's test answers.
+  const isBoard = ["10", "12"].includes(classNum);
+  const examType = isBoard ? "CBSE Board Examination" : `CBSE Class ${classNum} Annual Examination`;
+
+  return `You are an experienced CBSE examiner evaluating a Class ${classNum} student's test answers. Your evaluation must follow the EXACT CBSE marking scheme and evaluation standards used in the real ${examType}.
 
 Here are the questions, correct answers, and student's answers:
 
 ${questionsAndAnswers}
 
+CRITICAL EVALUATION INSTRUCTIONS:
+- Award marks EXACTLY as a real CBSE examiner would — check for key points, NCERT terminology, correct formulas, and proper answer structure.
+- Give step-marking for numerical/derivation questions (partial marks for correct intermediate steps).
+- Deduct marks for: missing keywords that CBSE examiners look for, incorrect NCERT terminology, incomplete diagrams, missing units in numerical answers.
+- Be encouraging but honest. Identify EXACT weak areas the student needs to fix before their ${examType}.
+
 For EACH question, evaluate the student's answer against the correct answer and key points.
-Give marks fairly based on key points covered.
 
 Format strictly as a JSON array (no other text, no markdown, just the JSON):
 
@@ -184,21 +266,58 @@ Format strictly as a JSON array (no other text, no markdown, just the JSON):
   {
     "marks_awarded": 2,
     "total_marks": 3,
-    "feedback": "Brief feedback on what was right/wrong",
-    "improvement_tip": "Specific tip to improve"
+    "feedback": "What was correct and what was missing — referencing CBSE marking standards",
+    "improvement_tip": "Specific, actionable tip to score full marks on this type of question in the actual ${examType}"
   }
 ]
 
-Be fair, exam-oriented, and concise. Give partial marks where appropriate.`;
+Be fair, follow CBSE step-marking rules, and give partial marks where appropriate. Every tip must be directly actionable for exam improvement.`;
 }
 
-// ── Call OpenRouter with fallback models ──────────────────────
+
+// ── Call AI Engine (OpenRouter primary → Bytez fallback) ───────
+function buildArenaPrompt(classNum, subject, chapter) {
+  const isBoard = ["10", "12"].includes(classNum);
+  const examType = isBoard ? "CBSE Board Examination" : `CBSE Class ${classNum} Annual Examination`;
+
+  return `You are a CBSE exam high-performance coach. Your goal is to train a Class ${classNum} student's "exam instincts" for the chapter: "${chapter}" from ${subject}.
+
+Generate 10 rapid-fire "Decision Questions" as a valid JSON array. Each question tests whether the student can identify the correct concept, method, or fact in under 8 seconds.
+
+CRITICAL INSTRUCTIONS:
+- Q1-3: EASY (Basic definitions/facts)
+- Q4-7: MEDIUM (Concept recognition/Method selection)
+- Q8-9: HARD (Error spotting/Formula recall)
+- Q10: BOSS QUESTION (Complex multi-concept decision)
+- Make questions punchy and short.
+- Every question must be solvable via NCERT patterns.
+
+Format strictly as JSON array:
+[
+  {
+    "type": "concept_recognition",
+    "difficulty": "easy",
+    "question": "The question text",
+    "options": ["A) Choice 1", "B) Choice 2", "C) Choice 3", "D) Choice 4"],
+    "answer": "Correct Choice",
+    "insightRefinement": "Brief tip if they get it wrong (e.g., 'You overcomplicated this')"
+  }
+]
+
+Question types must be: "concept_recognition", "method_selection", "quick_mcq", "error_spotting".
+
+Make it high-stakes and elite.`;
+}
+
 async function callOpenRouter(apiKey, systemMsg, prompt, maxTokens = 2048) {
+
+  // Fallback to Primary Protocol: OpenRouter Free Models
+  console.log(`🔌 Initializing OpenRouter Pipeline`);
   for (const model of FREE_MODELS) {
     try {
       console.log(`⏳ Trying model: ${model}`);
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 60000);
 
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -223,20 +342,96 @@ async function callOpenRouter(apiKey, systemMsg, prompt, maxTokens = 2048) {
       clearTimeout(timeout);
 
       if (response.ok) {
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
+        let data = await response.json();
+        let content = data.choices?.[0]?.message?.content;
+        
+        // Remove markdown wrappers often injected by Gemini/Flash
+        if (content && content.startsWith("\`\`\`json")) {
+           content = content.replace(/^\`\`\`json/i, "").replace(/\`\`\`$/i, "").trim();
+        }
+
         if (content) {
-          console.log(`✅ Success with model: ${model}`);
+          console.log(`✅ Success with ${model}`);
           return content;
         }
+        console.warn(`⚠️  ${model} returned empty content`);
+      } else {
+        const errBody = await response.text();
+        console.warn(`⚠️  ${model} failed (${response.status}): ${errBody.slice(0, 150)}`);
+        
+        // Smart rate-limit handling: if per-minute limit, wait before next model
+        if (response.status === 429 && errBody.includes("per-min")) {
+          console.log(`⏸️  Per-minute rate limit hit — waiting 5s before next model...`);
+          await new Promise(r => setTimeout(r, 5000));
+        }
       }
-
-      const errBody = await response.text();
-      console.warn(`⚠️  ${model} failed (${response.status}): ${errBody.slice(0, 150)}`);
     } catch (err) {
-      console.warn(`⚠️  ${model} threw: ${err.message}`);
+      console.warn(`⚠️  ${model} threw exception: ${err.message}`);
     }
   }
+
+  // ── FALLBACK: Bytez API (when ALL OpenRouter models are exhausted) ──
+  const bytezKey = process.env.BYTEZ_API_KEY;
+  if (bytezKey) {
+    // Bytez free tier: "sm" models only, 1 request at a time
+    const BYTEZ_MODELS = [
+      "Qwen/Qwen2-1.5B-Instruct",
+      "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    ];
+
+    console.log(`🔌 OpenRouter exhausted — falling back to Bytez API`);
+
+    // Try each model with generous timeout for cold starts
+    for (const bModel of BYTEZ_MODELS) {
+      // Wait between attempts to respect 1-req-at-a-time limit
+      await new Promise(r => setTimeout(r, 2000));
+
+      try {
+        console.log(`⏳ Trying Bytez: ${bModel}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120000); // 120s for cold start
+
+        const response = await fetch(`https://api.bytez.com/models/v2/${bModel}`, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": bytezKey,
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: systemMsg },
+              { role: "user", content: prompt },
+            ],
+          }),
+        });
+
+        clearTimeout(timeout);
+
+        if (response.ok) {
+          const data = await response.json();
+          const content = data.output?.content || data.output || data.choices?.[0]?.message?.content;
+          if (content && typeof content === "string" && content.length > 20) {
+            console.log(`✅ Success with Bytez: ${bModel}`);
+            return content;
+          }
+          console.warn(`⚠️  Bytez ${bModel} returned empty/short content`);
+        } else {
+          const errBody = await response.text();
+          console.warn(`⚠️  Bytez ${bModel} failed (${response.status}): ${errBody.slice(0, 150)}`);
+          // If rate limited, wait longer before trying next model
+          if (response.status === 429) {
+            console.log(`⏸️  Bytez rate limited — waiting 6s...`);
+            await new Promise(r => setTimeout(r, 6000));
+          }
+        }
+      } catch (err) {
+        console.warn(`⚠️  Bytez ${bModel} threw exception: ${err.message}`);
+      }
+    }
+  }
+
   return null;
 }
 
@@ -267,13 +462,34 @@ function extractJsonArray(raw) {
     } catch {}
   }
 
+  // ── Truncation repair: if output was cut off mid-JSON, rescue complete objects ──
+  if (start !== -1) {
+    let slice = raw.slice(start);
+    // Find the last complete object by looking for the last "}," or "}" before truncation
+    const lastCompleteObj = slice.lastIndexOf("}");
+    if (lastCompleteObj > 0) {
+      let repaired = slice.slice(0, lastCompleteObj + 1);
+      // Close the array
+      if (!repaired.trim().endsWith("]")) repaired = repaired.trim() + "]";
+      // Remove any trailing comma before the ]
+      repaired = repaired.replace(/,\s*\]$/, "]");
+      try {
+        const parsed = JSON.parse(repaired);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log(`🔧 Repaired truncated JSON: rescued ${parsed.length} items`);
+          return parsed;
+        }
+      } catch {}
+    }
+  }
+
   return null;
 }
 
 // ── API route: generate notes ────────────────────────────────
 app.post("/api/generate-notes", async (req, res) => {
   try {
-    const { classNum, subject, chapter } = req.body;
+    const { classNum, subject, chapter, topic } = req.body;
 
     if (!classNum || !subject || !chapter || !chapter.trim()) {
       return res.status(400).json({ error: "Class, subject, and chapter name are all required." });
@@ -287,8 +503,10 @@ app.post("/api/generate-notes", async (req, res) => {
       return res.status(500).json({ error: "Server misconfiguration: missing API key." });
     }
 
+    if (topic) console.log(`📌 Topic focus: "${topic}" within ${chapter}`);
+
     const systemMsg = "You are an expert CBSE teacher. Generate well-structured, exam-focused study notes appropriate for the student's class level. Use markdown formatting with headings (##), bullet points, and bold for emphasis.";
-    const prompt = buildNotesPrompt(classNum, subject, chapter.trim());
+    const prompt = buildNotesPrompt(classNum, subject, chapter.trim(), topic || "");
     const notes = await callOpenRouter(apiKey, systemMsg, prompt);
 
     if (!notes) {
@@ -373,7 +591,7 @@ app.post("/api/generate-questions", async (req, res) => {
 
     const systemMsg = "You are a CBSE exam paper setter. Generate exam-style questions as a valid JSON array. Output ONLY the JSON array, no other text.";
     const prompt = buildQuestionPrompt(classNum, subject, chapter.trim());
-    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 4000);
+    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 8000);
 
     if (!raw) {
       return res.status(502).json({ error: "All AI models are temporarily busy. Please try again in a minute." });
@@ -388,7 +606,7 @@ app.post("/api/generate-questions", async (req, res) => {
     const cleaned = questions
       .filter((q) => q && q.question && q.final_answer)
       .map((q) => ({
-        type: ["mcq", "short", "long", "case"].includes(q.type) ? q.type : "short",
+        type: ["mcq", "short", "long", "case", "assertion"].includes(q.type) ? q.type : "short",
         difficulty: ["easy", "medium", "hard"].includes(q.difficulty) ? q.difficulty : "medium",
         question: String(q.question).trim(),
         solution_steps: Array.isArray(q.solution_steps) ? q.solution_steps.map(String) : [String(q.solution_steps || "")],
@@ -427,7 +645,7 @@ app.post("/api/generate-test", async (req, res) => {
 
     const systemMsg = "You are a CBSE exam paper setter. Generate a test as a valid JSON array. Output ONLY the JSON array, no other text.";
     const prompt = buildTestPrompt(classNum, subject, chapter.trim());
-    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 4000);
+    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 8000);
 
     if (!raw) {
       return res.status(502).json({ error: "All AI models are temporarily busy. Please try again in a minute." });
@@ -442,7 +660,7 @@ app.post("/api/generate-test", async (req, res) => {
     const cleaned = questions
       .filter((q) => q && q.question && q.answer)
       .map((q) => ({
-        type: ["mcq", "short", "long"].includes(q.type) ? q.type : "short",
+        type: ["mcq", "short", "long", "case"].includes(q.type) ? q.type : "short",
         question: String(q.question).trim(),
         answer: String(q.answer).trim(),
         marks: Number(q.marks) || 2,
@@ -513,7 +731,7 @@ app.post("/api/evaluate-test", async (req, res) => {
 ${q.question}
 
 Correct Answer: ${q.answer}
-Key Points: ${q.key_points.join(", ")}
+Key Points: ${(q.key_points || []).join(", ")}
 
 Student's Answer: ${item.userAnswer}`;
     }).join("\n\n---\n\n");
@@ -572,8 +790,9 @@ Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
 
         // Check key points coverage
         let matched = 0;
-        const totalPoints = q.key_points.length || 1;
-        q.key_points.forEach(kp => {
+        const kp_arr = q.key_points || [];
+        const totalPoints = kp_arr.length || 1;
+        kp_arr.forEach(kp => {
           if (studentLower.includes(kp.toLowerCase())) matched++;
         });
 
@@ -623,6 +842,57 @@ Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
     const totalMax = finalResults.reduce((s, r) => s + r.total_marks, 0);
     console.log(`✅ Evaluated test: ${totalAwarded}/${totalMax}${useKeywordFallback ? " (keyword fallback)" : ""}`);
     return res.json({ results: finalResults, totalAwarded, totalMax });
+  } catch (err) {
+    console.error("Server error:", err);
+    return res.status(500).json({ error: "An unexpected error occurred. Please try again." });
+  }
+});
+
+// ── API route: generate arena ────────────────────────────────
+app.post("/api/generate-arena", async (req, res) => {
+  try {
+    const { classNum, subject, chapter } = req.body;
+
+    if (!classNum || !subject || !chapter || !chapter.trim()) {
+      return res.status(400).json({ error: "Class, subject, and chapter name are required." });
+    }
+
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Server misconfiguration: missing API key." });
+    }
+
+    const systemMsg = "You are a CBSE exam high-performance coach. Generate 10 rapid-fire decision questions as a valid JSON array. Output ONLY the JSON array, no other text.";
+    const prompt = buildArenaPrompt(classNum, subject, chapter.trim());
+    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 4000);
+
+    if (!raw) {
+      return res.status(502).json({ error: "All AI models are temporarily busy. Please try again in a minute." });
+    }
+
+    const questions = extractJsonArray(raw);
+    if (!questions || questions.length === 0) {
+      console.error("Failed to parse arena questions from:", raw.slice(0, 300));
+      return res.status(502).json({ error: "Failed to generate arena questions. Please try again." });
+    }
+
+    const cleaned = questions
+      .filter((q) => q && q.question && q.answer)
+      .map((q) => ({
+        type: ["concept_recognition", "method_selection", "quick_mcq", "error_spotting"].includes(q.type) ? q.type : "quick_mcq",
+        difficulty: ["easy", "medium", "hard", "boss"].includes(q.difficulty) ? q.difficulty : "medium",
+        question: String(q.question).trim(),
+        options: Array.isArray(q.options) ? q.options.map(String) : [],
+        answer: String(q.answer).trim(),
+        insightRefinement: String(q.insightRefinement || "Focus on the core principle.").trim(),
+      }));
+
+    if (cleaned.length === 0) {
+      return res.status(502).json({ error: "Generated questions were invalid. Please try again." });
+    }
+
+    console.log(`⚔️ Generated ${cleaned.length} Arena questions`);
+    return res.json({ questions: cleaned });
   } catch (err) {
     console.error("Server error:", err);
     return res.status(500).json({ error: "An unexpected error occurred. Please try again." });
@@ -835,24 +1105,35 @@ app.post("/api/get-video-help", async (req, res) => {
     const topicText = topic ? `specifically about "${topic}"` : "";
     const searchBase = `CBSE Class ${classNum || 10} ${subject} ${chapter}`;
 
-    const systemMsg = "You are a CBSE study helper. Recommend YouTube search queries for students. Output ONLY valid JSON array, no other text.";
+    const systemMsg = "You are a CBSE study helper. Recommend the BEST YouTube videos from REPUTABLE Indian educational channels ONLY. Output ONLY valid JSON array, no other text.";
     const prompt = `Suggest exactly 2 YouTube video search queries for a CBSE Class ${classNum || 10} student studying ${subject}, chapter "${chapter}" ${topicText}.
 
-Rules:
-- Queries should find SHORT (5-15 min) explanation videos
-- Focus on exam preparation, not full lectures
-- Include both Hindi and English medium options
-- Make queries specific enough to find relevant content
+CRITICAL RULES:
+- ONLY recommend from these TOP reputable channels:
+  * Physics Wallah (PW)
+  * Unacademy
+  * Vedantu
+  * Khan Academy India
+  * Magnet Brains
+  * Dear Sir
+  * Science and Fun Education
+  * Shobhit Nirwan
+  * Hashtag Study
+  * BYJU'S
+  * Apni Kaksha
 
-Also suggest a known educational YouTube channel for each.
+- Search queries MUST include: "CBSE Class ${classNum || 10}" + "${subject}" + "${chapter}"
+- Each query should target a SPECIFIC reputable channel
+- Focus on SHORT (8-20 min) chapter explanations, NOT full lectures
+- Include the channel name in the search query for accuracy
 
 Format strictly as JSON array:
 
 [
   {
-    "title": "Short descriptive title of what the video covers",
-    "search_query": "exact YouTube search query",
-    "channel_hint": "Suggested channel name",
+    "title": "Short descriptive title",
+    "search_query": "CBSE Class ${classNum || 10} ${subject} ${chapter} [channel name] explanation",
+    "channel_hint": "Exact channel name",
     "duration_hint": "~10 min",
     "focus": "concept/formula/solving"
   }
@@ -865,7 +1146,11 @@ Format strictly as JSON array:
       const parsed = extractJsonArray(raw);
       if (parsed && parsed.length > 0) {
         videos = parsed.slice(0, 2).map(v => {
-          const q = String(v.search_query || `${searchBase} explanation`).trim();
+          let q = String(v.search_query || `${searchBase} explanation`).trim();
+          // Ensure CBSE class info is in query
+          if (!q.toLowerCase().includes("cbse") && !q.toLowerCase().includes("class")) {
+            q = `CBSE Class ${classNum || 10} ${q}`;
+          }
           const encodedQ = encodeURIComponent(q);
           return {
             title: String(v.title || `${chapter} Explanation`).trim(),
@@ -873,35 +1158,35 @@ Format strictly as JSON array:
             url: `https://www.youtube.com/results?search_query=${encodedQ}`,
             thumbnail: `https://img.youtube.com/vi/default/hqdefault.jpg`,
             duration_hint: String(v.duration_hint || "~10 min").trim(),
-            channel_hint: String(v.channel_hint || "CBSE Education").trim(),
+            channel_hint: String(v.channel_hint || "Physics Wallah").trim(),
             focus: String(v.focus || "concept").trim(),
           };
         });
       }
     }
 
-    // Fallback: generate basic search links
+    // Fallback: target reputable channels specifically
     if (videos.length === 0) {
-      const q1 = `${searchBase} explanation in Hindi`;
-      const q2 = `${searchBase} ${topic || ""} exam preparation`;
+      const q1 = `CBSE Class ${classNum || 10} ${subject} ${chapter} Physics Wallah explanation`;
+      const q2 = `CBSE Class ${classNum || 10} ${subject} ${chapter} ${topic || ""} Vedantu one shot`;
       videos = [
         {
-          title: `${chapter} — Concept Explanation`,
+          title: `${chapter} — Physics Wallah Explanation`,
           search_query: q1,
           url: `https://www.youtube.com/results?search_query=${encodeURIComponent(q1)}`,
           thumbnail: `https://img.youtube.com/vi/default/hqdefault.jpg`,
-          duration_hint: "~10 min",
-          channel_hint: "CBSE Education",
+          duration_hint: "~15 min",
+          channel_hint: "Physics Wallah",
           focus: "concept",
         },
         {
-          title: `${chapter} — Exam Preparation`,
+          title: `${chapter} — Vedantu One Shot`,
           search_query: q2,
           url: `https://www.youtube.com/results?search_query=${encodeURIComponent(q2)}`,
           thumbnail: `https://img.youtube.com/vi/default/hqdefault.jpg`,
-          duration_hint: "~15 min",
-          channel_hint: "Study Channel",
-          focus: "solving",
+          duration_hint: "~20 min",
+          channel_hint: "Vedantu",
+          focus: "revision",
         },
       ];
     }
@@ -987,102 +1272,167 @@ Format strictly as a JSON object (no markdown, no extra text):
   }
 });
 
-// ── API route: generate audio script ─────────────────────────
+// ── API route: generate audiobook (AI script + Bytez bark TTS) ─
 app.post("/api/generate-audio-script", async (req, res) => {
   try {
-    const { classNum, subject, chapter, summaryText, mode } = req.body;
+    const { classNum, subject, chapter, summaryText } = req.body;
 
     if (!chapter || !summaryText) {
       return res.status(400).json({ error: "Chapter and summary text are required." });
     }
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "Server misconfiguration." });
-    }
+    if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
 
-    const isQuick = mode !== "podcast";
-    const systemMsg = isQuick
-      ? "You are a CBSE teacher. Convert study notes into a clear, spoken audio script. Output ONLY the script text, no formatting."
-      : "You are creating an educational podcast. Write a natural teacher-student conversation. Output ONLY the dialogue, no extra text.";
+    const bytezKey = process.env.BYTEZ_API_KEY;
+    if (!bytezKey) return res.status(500).json({ error: "Bytez API key not configured." });
 
-    const prompt = isQuick
-      ? `You are a CBSE teacher explaining a chapter to a Class ${classNum || 10} student.
+    // ── Step 1: Generate spoken script via OpenRouter ──
+    const systemMsg = "You are a CBSE teacher. Convert study notes into a clear, spoken audio script. Output ONLY the script text, no formatting.";
+    const prompt = `You are a CBSE teacher explaining a chapter to a Class ${classNum || 10} student.
 
 Subject: ${subject || "General"}
 Chapter: ${chapter}
 
-Convert the following summary into a short, clear audio script.
+Convert the following summary into a spoken audio script.
 
 Rules:
-- Keep it concise (2-4 minutes when spoken)
+- Keep it concise (2-3 minutes when spoken, about 300-400 words)
 - Use simple spoken language, as if talking to the student directly
-- Focus only on key concepts, formulas, and exam points
+- Focus on key concepts, formulas, and exam points
 - Avoid headings, bullet points, or markdown
 - Make it sound natural when spoken aloud
 - Use transitions like "Now let's talk about..." or "Remember that..."
+- Add pauses with "..." for emphasis
 
 Summary:
 ${summaryText.slice(0, 3000)}
 
-Output a clean spoken script, nothing else.`
-      : `Create an educational podcast conversation for a CBSE Class ${classNum || 10} student.
+Output a clean spoken script, nothing else.`;
 
-Subject: ${subject || "General"}
-Chapter: ${chapter}
-
-Requirements:
-- Conversation between Teacher and Student
-- Keep it engaging but focused on exams
-- Cover key concepts from the summary below
-- Include student asking questions
-- Highlight common mistakes students make
-- Keep it concise (6-8 minutes when spoken)
-- Use simple, clear language
-
-Summary:
-${summaryText.slice(0, 3000)}
-
-Format each line as:
-Teacher: ...
-Student: ...
-
-Output only the dialogue, nothing else.`;
-
-    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 3000);
-
+    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 2000);
     if (!raw) {
       return res.status(502).json({ error: "AI temporarily busy." });
     }
 
-    // Clean text for speech
     let script = raw
-      .replace(/\*\*/g, "")
-      .replace(/\*/g, "")
-      .replace(/#/g, "")
-      .replace(/[-•]/g, "")
+      .replace(/\*\*/g, "").replace(/\*/g, "")
+      .replace(/#/g, "").replace(/[-•]/g, "")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
     const wordCount = script.split(/\s+/).length;
-    const estMinutes = Math.round(wordCount / 140); // ~140 words/min spoken
+    console.log(`🎧 Generated audiobook script: ~${wordCount} words`);
 
-    console.log(`🎧 Generated ${isQuick ? "quick" : "podcast"} script: ~${wordCount} words, ~${estMinutes} min`);
+    // ── Step 2: Split into chunks for Bark (max ~200 chars each for best quality) ──
+    const sentences = script.match(/[^.!?]+[.!?]+/g) || [script];
+    const textChunks = [];
+    let current = "";
+    for (const sentence of sentences) {
+      if ((current + sentence).length > 180 && current) {
+        textChunks.push(current.trim());
+        current = sentence;
+      } else {
+        current += sentence;
+      }
+    }
+    if (current.trim()) textChunks.push(current.trim());
+
+    console.log(`🎤 Splitting into ${textChunks.length} chunks for Bark TTS...`);
+
+    // ── Step 3: Generate audio for each chunk via Bytez suno/bark ──
+    const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    
+    const audioChunks = [];
+    for (let i = 0; i < textChunks.length; i++) {
+      try {
+        console.log(`  🔊 Chunk ${i + 1}/${textChunks.length}: "${textChunks[i].slice(0, 40)}..."`);
+        
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 120000); // 2 min per chunk
+
+        const barkRes = await fetch("https://api.bytez.com/models/v2/suno/bark", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": bytezKey,
+          },
+          body: JSON.stringify({ text: textChunks[i] }),
+        });
+
+        clearTimeout(timeout);
+
+        if (!barkRes.ok) {
+          console.warn(`  ⚠️ Chunk ${i + 1} failed (${barkRes.status})`);
+          continue;
+        }
+
+        const barkData = await barkRes.json();
+        if (!barkData.output) {
+          console.warn(`  ⚠️ Chunk ${i + 1}: no output`);
+          continue;
+        }
+
+        // Save WAV chunk
+        const filename = `audiobook_${sessionId}_${i}.wav`;
+        const filePath = path.join(AUDIO_DIR, filename);
+        const audioBuffer = Buffer.from(barkData.output, "base64");
+        fs.writeFileSync(filePath, audioBuffer);
+
+        audioChunks.push({
+          url: `/audio/${filename}`,
+          text: textChunks[i],
+          index: i,
+        });
+
+        console.log(`  ✅ Chunk ${i + 1} saved (${Math.round(audioBuffer.length / 1024)}KB)`);
+      } catch (chunkErr) {
+        console.warn(`  ⚠️ Chunk ${i + 1} error: ${chunkErr.message}`);
+      }
+    }
+
+    if (audioChunks.length === 0) {
+      // Fallback: return script only, frontend can use browser TTS
+      return res.json({
+        script,
+        mode: "quick",
+        wordCount,
+        estimatedMinutes: Math.ceil(wordCount / 140),
+        audioChunks: [],
+        type: "text-only",
+      });
+    }
+
+    console.log(`🎧 Audiobook ready: ${audioChunks.length}/${textChunks.length} chunks`);
+
+    // Clean up old audiobook files
+    try {
+      const allFiles = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("audiobook_"));
+      if (allFiles.length > 60) {
+        const sorted = allFiles.sort();
+        const toDelete = sorted.slice(0, sorted.length - 60);
+        toDelete.forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
+      }
+    } catch {}
+
     return res.json({
       script,
-      mode: isQuick ? "quick" : "podcast",
+      mode: "quick",
       wordCount,
-      estimatedMinutes: estMinutes,
+      estimatedMinutes: Math.ceil(wordCount / 140),
+      audioChunks,
+      type: "bark-audio",
     });
   } catch (err) {
-    console.error("Server error:", err);
+    console.error("Audiobook error:", err);
     return res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
 
-// ── API route: generate music (Sonauto) ──────────────────────
-const SONAUTO_KEY = process.env.SONAUTO_API_KEY || "";
-const SONAUTO_BASE = "https://api.sonauto.ai/v1";
+// ── API route: generate memory song (Bytez suno/bark — free) ─
+const AUDIO_DIR = path.join(__dirname, "public", "audio");
+if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
 app.post("/api/generate-music", async (req, res) => {
   try {
@@ -1094,7 +1444,9 @@ app.post("/api/generate-music", async (req, res) => {
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
-    if (!SONAUTO_KEY) return res.status(500).json({ error: "Sonauto API key not configured." });
+
+    const bytezKey = process.env.BYTEZ_API_KEY;
+    if (!bytezKey) return res.status(500).json({ error: "Bytez API key not configured." });
 
     // ── Step 1: Generate lyrics via OpenRouter ──
     const level = performanceLevel || "medium";
@@ -1113,17 +1465,21 @@ Key points to cover:
 ${typeof points === "string" ? points : JSON.stringify(points)}
 
 Requirements:
-- Keep it short (max 1-2 minutes when sung)
+- Keep it VERY short (4-6 lines maximum, under 50 words total)
 - Make it extremely catchy and easy to remember
 - Include important formulas, definitions, or concepts
 - Use simple language a student would enjoy
 - The mood should be: ${mood}
 - Make it rhythmic and fun to sing along
-- Add a chorus that repeats key concepts
+- Wrap each line in ♪ symbols for singing
 
-Output song lyrics only. No titles, no instructions, no brackets.`;
+Example format:
+♪ Atoms have protons in the core ♪
+♪ Electrons orbit, wanting more ♪
 
-    const lyrics = await callOpenRouter(apiKey, systemMsg, lyricsPrompt, 1500);
+Output song lyrics only. No titles, no instructions, no brackets. Keep it under 50 words.`;
+
+    const lyrics = await callOpenRouter(apiKey, systemMsg, lyricsPrompt, 500);
     if (!lyrics) {
       return res.status(502).json({ error: "Failed to generate lyrics." });
     }
@@ -1135,88 +1491,437 @@ Output song lyrics only. No titles, no instructions, no brackets.`;
 
     console.log(`🎵 Generated lyrics: ${cleanLyrics.split(/\s+/).length} words`);
 
-    // ── Step 2: Style tags based on performance ──
+    // ── Step 2: Style label ──
+    const styleLabel = level === "high" ? "Victory Anthem" :
+                       level === "low"  ? "Comeback Track" :
+                                          "Study Groove";
     const styleTags = level === "high"
       ? ["pop", "upbeat", "energetic", "happy"]
       : level === "low"
       ? ["acoustic", "inspiring", "warm", "motivational"]
       : ["pop", "chill", "educational", "medium tempo"];
 
-    const styleLabel = level === "high" ? "Victory Anthem" :
-                       level === "low"  ? "Comeback Track" :
-                                          "Study Groove";
+    // ── Step 3: Format for Bark singing ──
+    // Bark uses ♪ to indicate singing and [laughs] etc for expressions
+    let barkPrompt = cleanLyrics;
+    // Ensure lyrics have ♪ notation for singing
+    if (!barkPrompt.includes("♪")) {
+      barkPrompt = barkPrompt.split("\n").filter(l => l.trim())
+        .map(line => `♪ ${line.trim()} ♪`)
+        .join("\n");
+    }
 
-    // ── Step 3: Send to Sonauto API ──
-    const genRes = await fetch(`${SONAUTO_BASE}/generations/v3`, {
+    console.log(`🎤 Sending to Bark for singing: ${barkPrompt.slice(0, 80)}...`);
+
+    // ── Step 4: Generate audio via Bytez suno/bark ──
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000); // 3 min timeout
+
+    const barkRes = await fetch("https://api.bytez.com/models/v2/suno/bark", {
       method: "POST",
+      signal: controller.signal,
       headers: {
-        "Authorization": `Bearer ${SONAUTO_KEY}`,
         "Content-Type": "application/json",
+        "Authorization": bytezKey,
       },
-      body: JSON.stringify({
-        prompt: `A short catchy educational song about ${chapter} for students. ${mood} vibe.`,
-        lyrics: cleanLyrics,
-        tags: styleTags,
-        instrumental: false,
-      }),
+      body: JSON.stringify({ text: barkPrompt }),
     });
 
-    const genData = await genRes.json();
+    clearTimeout(timeout);
 
-    if (!genRes.ok) {
-      console.error("Sonauto gen error:", genData);
-      return res.status(502).json({ error: "Music generation failed: " + (genData.detail || genData.message || "API error") });
+    if (!barkRes.ok) {
+      const errText = await barkRes.text();
+      console.warn(`⚠️ Bark failed (${barkRes.status}): ${errText.slice(0, 200)}`);
+      return res.status(502).json({ error: "Song generation failed. Please try again." });
     }
 
-    const taskId = genData.id || genData.task_id;
-    if (!taskId) {
-      return res.status(502).json({ error: "No task ID returned from Sonauto." });
+    const barkData = await barkRes.json();
+    
+    if (barkData.error) {
+      console.warn(`⚠️ Bark error: ${barkData.error}`);
+      return res.status(502).json({ error: "Song generation failed: " + barkData.error });
     }
 
-    console.log(`🎵 Sonauto task started: ${taskId}`);
+    const audioBase64 = barkData.output;
+    if (!audioBase64 || typeof audioBase64 !== "string") {
+      console.warn("⚠️ Bark: no audio output");
+      return res.status(502).json({ error: "No audio generated." });
+    }
 
-    // ── Step 4: Poll for completion ──
-    let audioUrl = null;
-    const maxPolls = 60; // max ~2 minutes
-    for (let i = 0; i < maxPolls; i++) {
-      await new Promise(r => setTimeout(r, 2000));
+    // ── Step 5: Save WAV to public/audio/ ──
+    const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const filename = `song_${sessionId}.wav`;
+    const filePath = path.join(AUDIO_DIR, filename);
 
-      const statusRes = await fetch(`${SONAUTO_BASE}/generations/status/${taskId}`, {
-        headers: { "Authorization": `Bearer ${SONAUTO_KEY}` },
-      });
+    const audioBuffer = Buffer.from(audioBase64, "base64");
+    fs.writeFileSync(filePath, audioBuffer);
+    
+    console.log(`✅ Memory song saved: ${filename} (${Math.round(audioBuffer.length / 1024)}KB)`);
 
-      const statusData = await statusRes.json();
-      const status = (statusData.status || "").toUpperCase();
-
-      if (status === "SUCCESS") {
-        const paths = statusData.song_paths || [];
-        audioUrl = paths[0] || null;
-        console.log(`🎵 Sonauto completed! Audio: ${audioUrl}`);
-        break;
-      } else if (status === "FAILURE") {
-        console.error("Sonauto failed:", statusData.error_message);
-        return res.status(502).json({ error: "Music generation failed: " + (statusData.error_message || "Unknown error") });
+    // ── Step 6: Clean up old songs (keep last 20) ──
+    try {
+      const allSongs = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("song_"));
+      if (allSongs.length > 20) {
+        const sorted = allSongs.sort();
+        const toDelete = sorted.slice(0, sorted.length - 20);
+        toDelete.forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
       }
-      // else still generating, continue polling
-    }
-
-    if (!audioUrl) {
-      return res.status(504).json({ error: "Music generation timed out. Please try again." });
-    }
+    } catch {}
 
     return res.json({
-      audio_url: audioUrl,
+      audio_url: `/audio/${filename}`,
       lyrics: cleanLyrics,
       style: styleLabel,
       tags: styleTags,
     });
   } catch (err) {
+    if (err.name === "AbortError") {
+      console.warn("⚠️ Bark song generation timed out");
+      return res.status(504).json({ error: "Song generation timed out." });
+    }
     console.error("Music generation error:", err);
     return res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
 
+// ── API route: generate AI video (Bytez — Multi-Clip) ────────
+// (fs, pipeline, Readable imported at top)
+
+// Ensure videos directory exists
+const VIDEOS_DIR = path.join(__dirname, "public", "videos");
+if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
+
+app.post("/api/generate-video", async (req, res) => {
+  try {
+    const { classNum, subject, chapter } = req.body;
+
+    if (!chapter) {
+      return res.status(400).json({ error: "Chapter is required." });
+    }
+
+    const bytezKey = process.env.BYTEZ_API_KEY;
+    if (!bytezKey) {
+      return res.status(500).json({ error: "Bytez API key not configured.", fallback: "youtube" });
+    }
+
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "OpenRouter API key not configured.", fallback: "youtube" });
+    }
+
+    // ── Step 1: Generate scene descriptions using AI ──
+    console.log(`🎬 Step 1: Generating scene descriptions for "${chapter}"...`);
+
+    const sceneSystemMsg = "You are an educational video director. Generate short, visual scene descriptions for an AI video generator. Output ONLY a valid JSON array, no other text.";
+    const scenePrompt = `Create 4 short visual scene descriptions for an educational video about CBSE Class ${classNum || 10} ${subject || ""} chapter: "${chapter}".
+
+Each scene should visually explain a KEY CONCEPT from the chapter.
+
+Rules:
+- Each scene description must be 1 sentence, max 15 words
+- Describe ONLY visual elements (what is shown on screen)
+- Use simple, concrete imagery (diagrams, objects, animations)
+- Avoid abstract concepts — make them visual
+- Focus on the most important exam concepts
+- Each scene should cover a DIFFERENT concept
+
+Format as JSON array of strings:
+["Scene 1 description", "Scene 2 description", "Scene 3 description", "Scene 4 description"]`;
+
+    const sceneRaw = await callOpenRouter(apiKey, sceneSystemMsg, scenePrompt, 500);
+    
+    let scenes = [];
+    if (sceneRaw) {
+      try {
+        const parsed = JSON.parse(sceneRaw);
+        if (Array.isArray(parsed)) scenes = parsed.slice(0, 5).map(String);
+      } catch {
+        const arr = extractJsonArray(sceneRaw);
+        if (arr) scenes = arr.slice(0, 5).map(String);
+      }
+    }
+
+    // Fallback scenes if AI fails
+    if (scenes.length === 0) {
+      scenes = [
+        `Educational diagram illustrating key concepts of ${chapter}`,
+        `Animated visualization of formulas and definitions for ${chapter}`,
+        `Colorful flowchart showing the process described in ${chapter}`,
+        `Summary infographic with important points from ${chapter}`,
+      ];
+    }
+
+    console.log(`📝 Generated ${scenes.length} scene descriptions`);
+
+    // ── Step 2: Generate video clips in parallel via Bytez ──
+    console.log(`🎬 Step 2: Generating ${scenes.length} video clips via Bytez...`);
+
+    const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    
+    const clipPromises = scenes.map(async (scene, idx) => {
+      try {
+        console.log(`  🎥 Clip ${idx + 1}: "${scene.slice(0, 50)}..."`);
+        
+        // Try models in order: zeroscope (faster) → ali-vilab (more detail)
+        const VIDEO_MODELS = [
+          "cerspense/zeroscope_v2_576w",
+          "ali-vilab/text-to-video-ms-1.7b",
+        ];
+
+        let data = null;
+        for (const model of VIDEO_MODELS) {
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 300000); // 5 min
+
+            const response = await fetch(`https://api.bytez.com/models/v2/${model}`, {
+              method: "POST",
+              signal: controller.signal,
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": bytezKey,
+              },
+              body: JSON.stringify({ text: scene }),
+            });
+
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+              console.warn(`  ⚠️ Clip ${idx + 1} failed with ${model} (${response.status})`);
+              continue; // try next model
+            }
+
+            data = await response.json();
+            const videoUrl = data.output || data.output_url || data.url;
+            
+            if (videoUrl) {
+              console.log(`  ✅ Clip ${idx + 1} generated via ${model.split("/")[0]}`);
+
+              // Download the clip to public/videos/
+              const filename = `clip_${sessionId}_${idx}.mp4`;
+              const filePath = path.join(VIDEOS_DIR, filename);
+              
+              const dlRes = await fetch(videoUrl);
+              if (!dlRes.ok) {
+                console.warn(`  ⚠️ Clip ${idx + 1}: download failed`);
+                continue;
+              }
+
+              const fileStream = fs.createWriteStream(filePath);
+              await pipeline(Readable.fromWeb(dlRes.body), fileStream);
+
+              console.log(`  💾 Clip ${idx + 1} saved: ${filename}`);
+              return {
+                url: `/videos/${filename}`,
+                scene: scene,
+                index: idx,
+              };
+            }
+          } catch (modelErr) {
+            console.warn(`  ⚠️ Clip ${idx + 1} failed with ${model}: ${modelErr.message}`);
+            continue;
+          }
+        }
+        // All models failed for this clip
+        console.warn(`  ❌ Clip ${idx + 1}: all models failed`);
+        return null;
+      } catch (err) {
+        console.warn(`  ⚠️ Clip ${idx + 1} error: ${err.message}`);
+        return null;
+      }
+    });
+
+    const clipResults = await Promise.all(clipPromises);
+    const clips = clipResults.filter(Boolean).sort((a, b) => a.index - b.index);
+
+    if (clips.length === 0) {
+      console.warn("⚠️ All clips failed, falling back to YouTube");
+      return res.status(502).json({ 
+        error: "Video generation failed for all scenes.", 
+        fallback: "youtube" 
+      });
+    }
+
+    console.log(`🎬 Successfully generated ${clips.length}/${scenes.length} clips`);
+
+    // ── Step 3: Clean up old clips (keep last 20 sessions only) ──
+    try {
+      const allFiles = fs.readdirSync(VIDEOS_DIR).filter(f => f.startsWith("clip_"));
+      if (allFiles.length > 100) {
+        const sorted = allFiles.sort();
+        const toDelete = sorted.slice(0, sorted.length - 100);
+        toDelete.forEach(f => fs.unlinkSync(path.join(VIDEOS_DIR, f)));
+        console.log(`🧹 Cleaned ${toDelete.length} old video clips`);
+      }
+    } catch {}
+
+    return res.json({
+      clips,
+      sessionId,
+      chapter,
+      totalClips: clips.length,
+      type: "playlist",
+    });
+
+  } catch (err) {
+    console.error("Video generation error:", err);
+    return res.status(500).json({ error: "An unexpected error occurred.", fallback: "youtube" });
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// AUTH MIDDLEWARE & USER HISTORY API (Supabase)
+// ═══════════════════════════════════════════════════
+
+// Auth middleware — verifies Supabase JWT access token
+async function verifyAuth(req, res, next) {
+  if (!supabase) {
+    return res.status(503).json({ error: "Auth not configured" });
+  }
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "No auth token provided" });
+  }
+  try {
+    const token = authHeader.split("Bearer ")[1];
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: "Invalid auth token" });
+    }
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid auth token" });
+  }
+}
+
+// Serve Supabase client config to frontend (only public keys)
+app.get("/api/auth-config", (req, res) => {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return res.json({ configured: false });
+  }
+  res.json({
+    configured: true,
+    config: {
+      supabaseUrl: SUPABASE_URL,
+      supabaseAnonKey: SUPABASE_ANON_KEY,
+    },
+  });
+});
+
+// GET /api/history — fetch user's study history
+app.get("/api/history", verifyAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("study_history")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json({ history: data || [] });
+  } catch (err) {
+    console.error("History fetch error:", err.message);
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
+
+// POST /api/history — save a study session
+app.post("/api/history", verifyAuth, async (req, res) => {
+  try {
+    const { classNum, subject, chapter, topic, step, data } = req.body;
+    if (!classNum || !subject || !chapter) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    // Upsert: use user_id + class + subject + chapter as unique key
+    const sessionKey = `${classNum}-${subject}-${chapter}`.replace(/[^a-zA-Z0-9-]/g, "_");
+
+    const { data: existing } = await supabase
+      .from("study_history")
+      .select("id, steps")
+      .eq("user_id", req.user.id)
+      .eq("session_key", sessionKey)
+      .single();
+
+    if (existing) {
+      // Update existing entry
+      const updatedSteps = { ...(existing.steps || {}), ...(step ? { [step]: true } : {}) };
+      const { error } = await supabase
+        .from("study_history")
+        .update({
+          steps: updatedSteps,
+          latest_data: data || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+      if (error) throw error;
+      res.json({ success: true, sessionId: existing.id });
+    } else {
+      // Insert new entry
+      const { data: newEntry, error } = await supabase
+        .from("study_history")
+        .insert({
+          user_id: req.user.id,
+          session_key: sessionKey,
+          class_num: classNum,
+          subject,
+          chapter,
+          topic: topic || "",
+          steps: step ? { [step]: true } : {},
+          latest_data: data || null,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      res.json({ success: true, sessionId: newEntry?.id });
+    }
+
+    // Update user profile in profiles table
+    await supabase.from("profiles").upsert({
+      id: req.user.id,
+      email: req.user.email || "",
+      display_name: req.user.user_metadata?.full_name || req.user.user_metadata?.name || "",
+      avatar_url: req.user.user_metadata?.avatar_url || "",
+      last_active: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("History save error:", err.message);
+    res.status(500).json({ error: "Failed to save history" });
+  }
+});
+
+// DELETE /api/history — clear all history for user
+app.delete("/api/history", verifyAuth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from("study_history")
+      .delete()
+      .eq("user_id", req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("History clear error:", err.message);
+    res.status(500).json({ error: "Failed to clear history" });
+  }
+});
+
+// DELETE /api/history/:id — delete a single history entry
+app.delete("/api/history/:id", verifyAuth, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from("study_history")
+      .delete()
+      .eq("id", req.params.id)
+      .eq("user_id", req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error("History delete error:", err.message);
+    res.status(500).json({ error: "Failed to delete entry" });
+  }
+});
+
 // ── Start server ─────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 NotesGPT server running at http://localhost:${PORT}`);
 });

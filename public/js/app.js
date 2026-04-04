@@ -1,28 +1,31 @@
 // ══════════════════════════════════════════════
-// NotesGPT — Main App Logic
+// NotesGPT — Main App Logic (v2 — 11-Step Flow)
 // ══════════════════════════════════════════════
+// Flow: Summary → Flashcards → Practice → Test → Fix → Improve → Unlock → Mind Map → Audio Book → AI Video → Song
 
 // ── Current session state ────────────────────
 let currentClassNum = "";
 let currentSubject = "";
 let currentChapter = "";
+let currentTopic = "";
 window.currentClassNum = "";
 window.currentSubject = "";
 window.currentChapter = "";
+window.currentTopic = "";
 
 // ── DOM refs ─────────────────────────────────
 const DOM = {
   form: document.getElementById("notes-form"),
   classSelect: document.getElementById("class-select"),
   subject: document.getElementById("subject-select"),
-  chapter: document.getElementById("chapter-input"),
+  chapter: document.getElementById("chapter-select"),
   submitBtn: document.getElementById("submit-btn"),
   errorMsg: document.getElementById("error-msg"),
-  dashboardSection: document.getElementById("dashboard-section"),
   dashStats: document.getElementById("dash-stats"),
   dashChapters: document.getElementById("dash-chapters"),
   dashTasks: document.getElementById("dash-tasks"),
   dashNewBtn: document.getElementById("dash-new-btn"),
+  histSection: document.getElementById("hist-section"),
   inputSection: document.getElementById("input-section"),
   loadingSection: document.getElementById("loading-section"),
   outputSection: document.getElementById("output-section"),
@@ -47,13 +50,21 @@ const DOM = {
   retryLoading: document.getElementById("retry-loading"),
   retrySection: document.getElementById("retry-section"),
   retryComplete: document.getElementById("retry-complete"),
+  unlockSection: document.getElementById("unlock-section"),
   mindmapLoading: document.getElementById("mindmap-loading"),
   mindmapSection: document.getElementById("mindmap-section"),
+  audiobookSection: document.getElementById("audiobook-section"),
+  aivideoSection: document.getElementById("aivideo-section"),
+  songSection: document.getElementById("song-section"),
+  arenaLoading: document.getElementById("arena-loading"),
+  arenaSection: document.getElementById("arena-section"),
+  arenaResults: document.getElementById("arena-results"),
+  reviewSection: document.getElementById("review-section"),
+  histSectionWrap: document.getElementById("hist-section-wrap"),
 };
 
-// All view sections
+// All sequential view sections
 const ALL_SECTIONS = [
-  DOM.dashboardSection,
   DOM.inputSection,
   DOM.loadingSection,
   DOM.outputSection,
@@ -71,14 +82,74 @@ const ALL_SECTIONS = [
   DOM.retryLoading,
   DOM.retrySection,
   DOM.retryComplete,
+  DOM.unlockSection,
   DOM.mindmapLoading,
   DOM.mindmapSection,
+  DOM.audiobookSection,
+  DOM.aivideoSection,
+  DOM.songSection,
+  DOM.arenaLoading,
+  DOM.arenaSection,
+  DOM.arenaResults,
+  DOM.reviewSection,
 ];
 
 // ── Global view manager ──────────────────────
+function updateStepper(view) {
+  const stepper = document.getElementById("flow-stepper");
+  if (!stepper) return;
+  
+  // Only show stepper during active learning flow
+  const learningViews = [
+    "loading", "output",
+    "flashcard-loading", "flashcards", "flashcard-complete",
+    "practice-loading", "practice", "practice-complete",
+    "test-loading", "test", "test-eval-loading", "test-results",
+    "correction", "retry-loading", "retry", "retry-complete",
+    "unlock",
+    "mindmap-loading", "mindmap",
+    "audiobook",
+    "aivideo",
+    "song",
+  ];
+  if (learningViews.includes(view)) {
+    stepper.classList.remove("hidden");
+  } else {
+    stepper.classList.add("hidden");
+    return;
+  }
+
+  // 5 phases: Learn, Practice, Fix, Revise, Master
+  const steps = ["step-learn", "step-practice", "step-fix", "step-revise", "step-master"];
+  
+  let activeIndex = 0;
+  // Learn phase: summary, flashcards
+  if (["loading", "output", "flashcard-loading", "flashcards", "flashcard-complete"].includes(view)) activeIndex = 0;
+  // Practice phase: practice, test
+  else if (["practice-loading", "practice", "practice-complete", "test-loading", "test", "test-eval-loading", "test-results"].includes(view)) activeIndex = 1;
+  // Fix phase: correction, retry, unlock
+  else if (["correction", "retry-loading", "retry", "retry-complete", "unlock"].includes(view)) activeIndex = 2;
+  // Revise phase: mindmap, audiobook
+  else if (["mindmap-loading", "mindmap", "audiobook"].includes(view)) activeIndex = 3;
+  // Master phase: aivideo, song
+  else if (["aivideo", "song"].includes(view)) activeIndex = 4;
+
+  steps.forEach((stepId, index) => {
+    const el = document.getElementById(stepId);
+    if (!el) return;
+    
+    el.classList.remove("flow-step--active", "flow-step--completed");
+    
+    if (index === activeIndex) {
+      el.classList.add("flow-step--active");
+    } else if (index < activeIndex) {
+      el.classList.add("flow-step--completed");
+    }
+  });
+}
+
 function setGlobalView(view) {
   const viewMap = {
-    dashboard: DOM.dashboardSection,
     form: DOM.inputSection,
     loading: DOM.loadingSection,
     output: DOM.outputSection,
@@ -96,25 +167,21 @@ function setGlobalView(view) {
     "retry-loading": DOM.retryLoading,
     retry: DOM.retrySection,
     "retry-complete": DOM.retryComplete,
+    unlock: DOM.unlockSection,
     "mindmap-loading": DOM.mindmapLoading,
     mindmap: DOM.mindmapSection,
+    audiobook: DOM.audiobookSection,
+    aivideo: DOM.aivideoSection,
+    song: DOM.songSection,
+    review: DOM.reviewSection,
   };
 
-  ALL_SECTIONS.forEach((s) => s.classList.add("hidden"));
+  ALL_SECTIONS.forEach((s) => { if (s) s.classList.add("hidden"); });
   const target = viewMap[view];
   if (target) target.classList.remove("hidden");
 
-  // Show audio section inline with test results (after scores)
-  if (typeof AudioPlayer !== "undefined") {
-    if (view === "test-results") AudioPlayer.show();
-    else AudioPlayer.stop();
-  }
-
-  // Show music section with test results
-  if (typeof MusicPlayer !== "undefined") {
-    if (view === "test-results") MusicPlayer.show();
-    else MusicPlayer.hide();
-  }
+  // Update Stepper UI
+  updateStepper(view);
 }
 
 window.setGlobalView = setGlobalView;
@@ -128,97 +195,23 @@ function resetToForm() {
 
 window.resetToForm = resetToForm;
 
-// ── Mind Map button ──────────────────────────
-const mindmapBtn = document.getElementById("mindmap-btn");
-if (mindmapBtn) {
-  mindmapBtn.addEventListener("click", () => {
-    if (typeof MindMap !== "undefined" && currentClassNum && currentSubject && currentChapter) {
-      MindMap.generate(currentClassNum, currentSubject, currentChapter);
-    }
-  });
-}
-
 // ══════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════
 
 function renderDashboard() {
   const chapters = Tracker.getAllChapters();
+  const wrap = DOM.histSectionWrap || document.getElementById("hist-section-wrap");
 
   if (chapters.length === 0) {
-    // No history — show form only
-    DOM.dashboardSection.classList.add("hidden");
-    DOM.inputSection.classList.remove("hidden");
+    if (wrap) wrap.style.display = "none";
+    setGlobalView("form");
     return;
   }
 
-  // Show dashboard + form
-  ALL_SECTIONS.forEach((s) => s.classList.add("hidden"));
-  DOM.dashboardSection.classList.remove("hidden");
-  DOM.inputSection.classList.remove("hidden");
-
-  // ── Stats row ──
-  const stats = Tracker.getDashboardStats();
-  DOM.dashStats.innerHTML = `
-    <div class="dash-stat">
-      <span class="dash-stat__num">${stats.total}</span>
-      <span class="dash-stat__label">Chapters</span>
-    </div>
-    <div class="dash-stat dash-stat--green">
-      <span class="dash-stat__num">${stats.strong}</span>
-      <span class="dash-stat__label">Strong</span>
-    </div>
-    <div class="dash-stat dash-stat--amber">
-      <span class="dash-stat__num">${stats.moderate}</span>
-      <span class="dash-stat__label">Moderate</span>
-    </div>
-    <div class="dash-stat dash-stat--red">
-      <span class="dash-stat__num">${stats.weak}</span>
-      <span class="dash-stat__label">Weak</span>
-    </div>
-  `;
-
-  // ── Chapter cards ──
-  const levelIcons = { strong: "✅", moderate: "⚠️", weak: "❌", new: "🆕" };
-  const levelLabels = { strong: "Strong", moderate: "Moderate", weak: "Weak", new: "New" };
-
-  DOM.dashChapters.innerHTML = chapters.slice(0, 8).map(ch => {
-    const issue = Tracker.detectIssue(ch);
-    const fcPct = ch.flashcards ? `${ch.flashcards.knewPct}%` : "—";
-    const prPct = ch.practice ? `${ch.practice.attemptPct}%` : "—";
-    const tsPct = ch.test ? `${ch.test.pct}%` : "—";
-
-    return `
-      <div class="dash-ch dash-ch--${ch.level}">
-        <div class="dash-ch__header">
-          <span class="dash-ch__icon">${levelIcons[ch.level] || "📚"}</span>
-          <div class="dash-ch__info">
-            <span class="dash-ch__name">${ch.chapter}</span>
-            <span class="dash-ch__meta">Class ${ch.classNum} · ${ch.subject}</span>
-          </div>
-          <span class="dash-ch__level dash-ch__level--${ch.level}">${levelLabels[ch.level]}</span>
-        </div>
-        <div class="dash-ch__scores">
-          <span class="dash-ch__score">🔒 ${fcPct}</span>
-          <span class="dash-ch__score">📋 ${prPct}</span>
-          <span class="dash-ch__score">📝 ${tsPct}</span>
-        </div>
-        ${issue ? `<div class="dash-ch__issue">${issue.icon} ${issue.label}: ${issue.desc}</div>` : ""}
-      </div>
-    `;
-  }).join("");
-
-  // ── Today's tasks ──
-  const tasks = Tracker.getTodayTasks();
-  if (tasks.length > 0) {
-    DOM.dashTasks.innerHTML = `
-      <h3 class="dash-tasks__title">🎯 Today's Tasks</h3>
-      <ul class="dash-tasks__list">
-        ${tasks.map(t => `<li class="dash-tasks__item">${t.text}</li>`).join("")}
-      </ul>
-    `;
-  } else {
-    DOM.dashTasks.innerHTML = "";
+  if (wrap) wrap.style.display = "block";
+  if (!document.querySelector(".flow-step--active")) {
+     setGlobalView("form");
   }
 
   // ── Saved History ──
@@ -243,6 +236,8 @@ DOM.classSelect.addEventListener("change", async () => {
   const classNum = DOM.classSelect.value;
   DOM.subject.disabled = true;
   DOM.subject.innerHTML = '<option value="" disabled selected>Loading…</option>';
+  DOM.chapter.disabled = true;
+  DOM.chapter.innerHTML = '<option value="" disabled selected>Select subject first</option>';
 
   try {
     const res = await fetch(`/api/subjects/${classNum}`);
@@ -261,6 +256,29 @@ DOM.classSelect.addEventListener("change", async () => {
     DOM.subject.innerHTML = '<option value="" disabled selected>Error loading</option>';
   }
 });
+
+// ── Dynamic Chapter Loader ───────────────────
+DOM.subject.addEventListener("change", () => {
+  const classNum = DOM.classSelect.value;
+  const subjectStr = DOM.subject.value;
+  
+  DOM.chapter.disabled = true;
+  DOM.chapter.innerHTML = '<option value="" disabled selected>Select a chapter</option>';
+
+  if (typeof CBSE_SYLLABUS !== "undefined" && CBSE_SYLLABUS[classNum]) {
+    const chapters = CBSE_SYLLABUS[classNum][subjectStr] || [];
+    chapters.forEach((ch) => {
+      const opt = document.createElement("option");
+      opt.value = ch;
+      opt.textContent = ch;
+      DOM.chapter.appendChild(opt);
+    });
+    if (chapters.length > 0) {
+      DOM.chapter.disabled = false;
+    }
+  }
+});
+
 
 // ── Simple Markdown → HTML renderer ──────────
 function renderMarkdown(md) {
@@ -330,6 +348,8 @@ DOM.form.addEventListener("submit", async (e) => {
   const classNum = DOM.classSelect.value;
   const subject = DOM.subject.value;
   const chapter = DOM.chapter.value.trim();
+  const topicEl = document.getElementById("topic-input");
+  const topic = topicEl ? topicEl.value.trim() : "";
 
   if (!classNum) { showError("Please select a class."); return; }
   if (!subject) { showError("Please select a subject."); return; }
@@ -338,9 +358,11 @@ DOM.form.addEventListener("submit", async (e) => {
   currentClassNum = classNum;
   currentSubject = subject;
   currentChapter = chapter;
+  currentTopic = topic;
   window.currentClassNum = classNum;
   window.currentSubject = subject;
   window.currentChapter = chapter;
+  window.currentTopic = topic;
 
   DOM.submitBtn.disabled = true;
   setGlobalView("loading");
@@ -349,14 +371,16 @@ DOM.form.addEventListener("submit", async (e) => {
     const res = await fetch("/api/generate-notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ classNum, subject, chapter }),
+      body: JSON.stringify({ classNum, subject, chapter, topic }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Something went wrong.");
 
     DOM.outputBadge.textContent = `Class ${classNum}`;
-    DOM.outputTitle.textContent = `${subject} — ${chapter}`;
+    DOM.outputTitle.textContent = topic
+      ? `${subject} — ${chapter} → ${topic}`
+      : `${subject} — ${chapter}`;
     DOM.notesContent.innerHTML = renderMarkdown(data.notes);
 
     // Save to history
@@ -366,6 +390,7 @@ DOM.form.addEventListener("submit", async (e) => {
         type: "summary",
         preview: data.notes.slice(0, 120),
       });
+      History.saveContent(classNum, subject, chapter, "summary", DOM.notesContent.innerHTML);
     }
 
     setGlobalView("output");
@@ -378,32 +403,181 @@ DOM.form.addEventListener("submit", async (e) => {
 });
 
 // ── Button handlers ──────────────────────────
-DOM.newNotesBtn.addEventListener("click", resetToForm);
+if (DOM.newNotesBtn) DOM.newNotesBtn.addEventListener("click", resetToForm);
 
-DOM.dashNewBtn.addEventListener("click", () => {
+if (DOM.dashNewBtn) DOM.dashNewBtn.addEventListener("click", () => {
   DOM.chapter.focus();
   DOM.chapter.scrollIntoView({ behavior: "smooth" });
 });
 
-DOM.flashcardBtn.addEventListener("click", () => {
-  if (currentClassNum && currentSubject && currentChapter) {
-    Flashcards.start(currentClassNum, currentSubject, currentChapter);
-  }
-});
+// Summary → Flashcards
+if (DOM.flashcardBtn) {
+  DOM.flashcardBtn.addEventListener("click", () => {
+    if (currentClassNum && currentSubject && currentChapter) {
+      Flashcards.start(currentClassNum, currentSubject, currentChapter);
+    }
+  });
+}
 
-DOM.fcPracticeBtn.addEventListener("click", () => {
-  if (currentClassNum && currentSubject && currentChapter) {
-    Practice.start(currentClassNum, currentSubject, currentChapter);
-  }
-});
+// Flashcard Complete → Practice
+if (DOM.fcPracticeBtn) {
+  DOM.fcPracticeBtn.addEventListener("click", () => {
+    if (currentClassNum && currentSubject && currentChapter) {
+      Practice.start(currentClassNum, currentSubject, currentChapter);
+    }
+  });
+}
 
-DOM.pqTestBtn.addEventListener("click", () => {
-  if (currentClassNum && currentSubject && currentChapter) {
-    TestEngine.start(currentClassNum, currentSubject, currentChapter);
-  }
-});
+// Practice Complete → Test
+if (DOM.pqTestBtn) {
+  DOM.pqTestBtn.addEventListener("click", () => {
+    if (currentClassNum && currentSubject && currentChapter) {
+      TestEngine.start(currentClassNum, currentSubject, currentChapter);
+    }
+  });
+}
 
-// ── On page load: render dashboard ───────────
+// ── On page load: render dashboard & handle landing ──
 document.addEventListener("DOMContentLoaded", () => {
   renderDashboard();
+
+  const landingView = document.getElementById("landing-view");
+  const appView = document.getElementById("app-view");
+  const heroBtn = document.getElementById("hero-start-btn");
+  const footerBtn = document.getElementById("footer-start-btn");
+
+  const startApp = () => {
+    landingView.style.opacity = "0";
+    landingView.style.transform = "translateY(-20px)";
+    landingView.style.transition = "all 0.4s ease-out";
+    
+    setTimeout(() => {
+      landingView.style.display = "none";
+      appView.classList.remove("hidden");
+      appView.style.opacity = "0";
+      appView.style.animation = "fadeUp 0.6s ease-out forwards";
+      window.scrollTo(0, 0);
+    }, 400);
+  };
+
+  const ctaBtns = document.querySelectorAll(".lp-cta-btn, #hero-start-btn, #footer-start-btn");
+  ctaBtns.forEach(btn => btn.addEventListener("click", startApp));
+
+  // ── Retry Complete → Unlock ──────────────────
+  const retryUnlockBtn = document.getElementById("retry-unlock-btn");
+  if (retryUnlockBtn) {
+    retryUnlockBtn.addEventListener("click", () => {
+      // Show unlock stats
+      const unlockStats = document.getElementById("unlock-stats");
+      if (unlockStats) {
+        unlockStats.innerHTML = `
+          <div class="complete__stat complete__stat--green">
+            <span class="complete__stat-num">✅</span>
+            <span class="complete__stat-label">Notes Done</span>
+          </div>
+          <div class="complete__stat complete__stat--blue">
+            <span class="complete__stat-num">✅</span>
+            <span class="complete__stat-label">Tested</span>
+          </div>
+          <div class="complete__stat complete__stat--amber">
+            <span class="complete__stat-num">✅</span>
+            <span class="complete__stat-label">Mistakes Fixed</span>
+          </div>
+        `;
+      }
+      setGlobalView("unlock");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  // ── Unlock → Mind Map ────────────────────────
+  const unlockMindmapBtn = document.getElementById("unlock-mindmap-btn");
+  if (unlockMindmapBtn) {
+    unlockMindmapBtn.addEventListener("click", () => {
+      if (typeof MindMap !== "undefined" && currentClassNum && currentSubject && currentChapter) {
+        MindMap.generate(currentClassNum, currentSubject, currentChapter);
+      }
+    });
+  }
+
+  // ── Mind Map → Audio Book ────────────────────
+  const mindmapContinueBtn = document.getElementById("mindmap-continue-btn");
+  if (mindmapContinueBtn) {
+    mindmapContinueBtn.addEventListener("click", () => {
+      setGlobalView("audiobook");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  // ── Audio Book → AI Video ────────────────────
+  const audiobookContinueBtn = document.getElementById("audiobook-continue-btn");
+  if (audiobookContinueBtn) {
+    audiobookContinueBtn.addEventListener("click", () => {
+      setGlobalView("aivideo");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  // ── AI Video → Song ──────────────────────────
+  const aivideoContinueBtn = document.getElementById("aivideo-continue-btn");
+  if (aivideoContinueBtn) {
+    aivideoContinueBtn.addEventListener("click", () => {
+      setGlobalView("song");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  // ── Song Complete → Exam Arena ────────────────
+  const songCompleteBtn = document.getElementById("song-complete-btn");
+  if (songCompleteBtn) {
+    songCompleteBtn.addEventListener("click", () => {
+      if (typeof ExamArena !== "undefined" && window.currentClassNum && window.currentSubject && window.currentChapter) {
+        ExamArena.startArena(window.currentClassNum, window.currentSubject, window.currentChapter);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        resetToForm();
+      }
+    });
+  }
+
+  // ── Review section buttons ────────────────────
+  const reviewCloseBtn = document.getElementById("review-close-btn");
+  if (reviewCloseBtn) {
+    reviewCloseBtn.addEventListener("click", () => {
+      setGlobalView("form");
+      renderDashboard();
+    });
+  }
+
+  const reviewPracticeBtn = document.getElementById("review-practice-btn");
+  if (reviewPracticeBtn) {
+    reviewPracticeBtn.addEventListener("click", () => {
+      if (window.currentClassNum && window.currentSubject && window.currentChapter) {
+        Practice.start(window.currentClassNum, window.currentSubject, window.currentChapter);
+      }
+    });
+  }
+
+  const reviewReviseBtn = document.getElementById("review-revise-btn");
+  if (reviewReviseBtn) {
+    reviewReviseBtn.addEventListener("click", () => {
+      setGlobalView("audiobook");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  // ── Auth state listener — sync history on login ──
+  if (typeof Auth !== "undefined") {
+    Auth.onAuthChange(async (user) => {
+      if (user) {
+        // User just logged in — sync from cloud
+        await History.syncFromCloud();
+        renderDashboard();
+        console.log(`✅ Signed in as ${user.displayName || user.email}`);
+      } else {
+        // User logged out — re-render with local data only
+        renderDashboard();
+      }
+    });
+  }
 });

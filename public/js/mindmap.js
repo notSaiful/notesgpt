@@ -16,7 +16,7 @@ const MindMap = (() => {
     els.title = document.getElementById("mindmap-title");
     els.dlPng = document.getElementById("mindmap-dl-png");
     els.dlPdf = document.getElementById("mindmap-dl-pdf");
-    els.backBtn = document.getElementById("mindmap-back-btn");
+    els.backBtn = document.getElementById("mindmap-continue-btn");
   }
 
   // ── Init ───────────────────────────────────
@@ -25,20 +25,7 @@ const MindMap = (() => {
 
     if (els.dlPng) els.dlPng.addEventListener("click", downloadPng);
     if (els.dlPdf) els.dlPdf.addEventListener("click", downloadPdf);
-    if (els.backBtn) {
-      els.backBtn.addEventListener("click", () => {
-        if (typeof FlashcardEngine !== "undefined") {
-          FlashcardEngine.start(
-            window.currentClassNum,
-            window.currentSubject,
-            window.currentChapter
-          );
-        } else {
-          setGlobalView("output");
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-      });
-    }
+    // Navigation (Mind Map → Audio Book) is wired in app.js via mindmap-continue-btn
   }
 
   // ── Generate mind map ──────────────────────

@@ -42,14 +42,14 @@ const Practice = (() => {
   function init() {
     cacheDom();
 
-    els.showSolutionBtn.addEventListener("click", showSolution);
-    els.attemptBtn.addEventListener("click", showAttemptMode);
-    els.submitAttemptBtn.addEventListener("click", () => {
+    if (els.showSolutionBtn) els.showSolutionBtn.addEventListener("click", showSolution);
+    if (els.attemptBtn) els.attemptBtn.addEventListener("click", showAttemptMode);
+    if (els.submitAttemptBtn) els.submitAttemptBtn.addEventListener("click", () => {
       attempted++;
       showSolution();
     });
-    els.nextBtn.addEventListener("click", nextQuestion);
-    els.newNotesBtn.addEventListener("click", () => {
+    if (els.nextBtn) els.nextBtn.addEventListener("click", nextQuestion);
+    if (els.newNotesBtn) els.newNotesBtn.addEventListener("click", () => {
       if (typeof resetToForm === "function") resetToForm();
     });
   }

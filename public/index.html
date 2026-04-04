@@ -7,42 +7,327 @@
   <meta name="description" content="Generate exam-focused CBSE study notes, flashcards, practice questions, and tests instantly with AI. Covers Class 6 to 12." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css?v=5" />
 </head>
 <body>
-  <div class="bg-glow bg-glow--1"></div>
-  <div class="bg-glow bg-glow--2"></div>
-  <div class="bg-glow bg-glow--3"></div>
+  <!-- Film Grain Noise -->
+  <svg class="noise-overlay" style="display:none;">
+    <filter id="noiseFilter">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+    </filter>
+  </svg>
+  <div class="noise-element" style="position:fixed;top:0;left:0;right:0;bottom:0;opacity:0.045;mix-blend-mode:overlay;pointer-events:none;z-index:9990;filter:url(#noiseFilter);"></div>
 
-  <main class="container">
-    <!-- ── Hero ── -->
-    <header class="hero" id="hero">
-      <div class="logo">
-        <span class="logo__icon">📝</span>
-        <h1 class="logo__text">Notes<span class="accent">GPT</span></h1>
+  <!-- Legendary 3D Physics Neural Matrix Canvas -->
+  <canvas id="neural-matrix" class="neural-matrix"></canvas>
+
+  <!-- Background Infinite Data Marquee -->
+  <div class="marquee-container">
+    <div class="marquee-content">
+      [ CBSE CORE SYSTEMS RUNNING ] • [ NEURAL PATHWAYS ACTIVATED ] • [ DATA DISTILLATION SECURE ] • [ HOLOGRAPHIC PARALLAX 100% ] • [ GENERATING AWWWARDS MATRIX ] • 
+      [ CBSE CORE SYSTEMS RUNNING ] • [ NEURAL PATHWAYS ACTIVATED ] • [ DATA DISTILLATION SECURE ] • [ HOLOGRAPHIC PARALLAX 100% ] • [ GENERATING AWWWARDS MATRIX ] •
+    </div>
+  </div>
+
+  <div class="bg-gradient-fade"></div>
+
+  <!-- ═══════════════════════════════════════
+       LANDING PAGE VIEW
+       ═══════════════════════════════════════ -->
+  <header class="app-header">
+    <a href="index.html" class="app-header__logo">
+      <img src="assets/logo.svg" alt="NotesGPT Logo" class="app-logo-img">
+      <span>Notes<span class="accent">GPT</span></span>
+    </a>
+    <nav class="app-header__nav">
+      <a href="how-it-works.html" class="app-header__link">How It Works</a>
+      <a href="about.html" class="app-header__link">About</a>
+      <a href="privacy.html" class="app-header__link">Privacy</a>
+      <!-- Auth: Sign In button (shown when logged out) -->
+      <button class="app-header__cta" id="auth-btn">Sign In</button>
+      <!-- Auth: User profile badge (shown when logged in) -->
+      <div class="user-profile-badge" id="user-profile-badge" style="display:none;">
+        <img class="user-avatar" id="user-avatar" src="" alt="" />
+        <span class="user-name" id="user-display-name">Student</span>
+        <button class="user-signout-btn" id="user-signout-btn" title="Sign Out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
-      <p class="hero__tagline">AI-powered study notes for CBSE Class 6–12 — instant, structured, exam-ready.</p>
-    </header>
+    </nav>
+  </header>
 
-    <!-- ═══ Dashboard ═══ -->
-    <section class="card card--dashboard hidden" id="dashboard-section">
-      <h2 class="card__title">📊 Your Progress</h2>
-      <div class="dash-stats" id="dash-stats"></div>
-      <div class="dash-chapters" id="dash-chapters"></div>
-      <div class="dash-tasks" id="dash-tasks"></div>
+  <main id="landing-view" class="landing">
 
-      <!-- Saved History -->
-      <div class="hist-section" id="hist-section">
-        <div class="hist-header">
-          <h3 class="hist-header__title">📚 Study History</h3>
-          <button class="btn btn--outline btn--sm" id="hist-clear-btn">Clear All</button>
+    <!-- 1. Hero Section -->
+    <section class="lp-hero" id="lp-hero">
+      <div class="lp-hero-orb lp-hero-orb--1"></div>
+      <div class="lp-hero-orb lp-hero-orb--2"></div>
+      <div class="lp-hero-grid"></div>
+      
+      <div class="lp-hero__content">
+        <div class="lp-hero__badge animate-float">🚀 The #1 AI Study Hack for Students</div>
+        <h1 class="lp-hero__title animate-type-pop">Stop Reading Textbooks.<br>Start Acing Exams in Half the Time.</h1>
+        <p class="lp-hero__sub animate-fade-delay">Turn your massive 400-page syllabus into bite-sized summaries, active-recall flashcards, and instant mock exams. Study 10x faster.</p>
+        <div class="lp-hero__actions animate-fade-delay-2">
+          <button class="btn lp-cta-btn" id="hero-start-btn">Start Prepping Faster — Free</button>
+          <div class="lp-hero__trust">
+            Join 14,000+ students actively crushing their exams this week.<br>No credit card required.
+          </div>
         </div>
-        <div class="hist-list" id="hist-list"></div>
       </div>
-
-      <button class="btn btn--primary dash-new-btn" id="dash-new-btn">+ Study New Chapter</button>
     </section>
+
+    <!-- 2. Scroll Hook -->
+    <section class="lp-hook">
+      <p>Exams aren’t testing how smart you are.<br>They’re testing how efficiently you prepare.</p>
+    </section>
+
+    <!-- 3. The Problem -->
+    <section class="lp-problem">
+      <h2 class="lp-section-title">"Working harder" is the worst study advice you've ever received.</h2>
+      <div class="lp-problem__grid">
+        <div class="lp-problem__text">
+          <p>Staring at a textbook for 6 hours straight and highlighting everything doesn't actually work.</p>
+          <p>You feel incredibly productive, but when you sit in the exam hall? <strong>Your mind goes completely blank.</strong></p>
+          <p>You aren't lazy. You just aren't using the right tools.</p>
+          <p class="lp-problem__punchline">What if the problem isn’t your brain, but your study method?</p>
+        </div>
+        <div class="lp-problem__visual">
+          <div class="lp-mock-error">
+            <span>⚠️ 6 Hours of Reading Detected</span>
+            <div class="lp-mock-graph"></div>
+            <span>Retention Rate: 10%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. The Solution -->
+    <section class="lp-solution">
+      <h2 class="lp-section-title">Meet NotesGPT. Your AI Academic Weapon.</h2>
+      <div class="lp-solution__card">
+        <p>NotesGPT is a hyper-focused exam-prep engine.</p>
+        <p>Give it any chapter, and it instantly strips out the filler to give you exactly what will be on the test. It forces you to learn via active recall—the exact scientific method used by the top 1% of rankers.</p>
+      </div>
+    </section>
+
+    <!-- 5. Core Benefits -->
+    <section class="lp-benefits">
+      <div class="lp-benefits__grid">
+        <div class="lp-benefit-card">
+          <div class="lp-benefit-card__icon">⚡</div>
+          <h3 class="lp-benefit-card__title">Learn 10x Faster</h3>
+          <p class="lp-benefit-card__desc"><strong>Compress Chapters into Minutes.</strong> NotesGPT strips away the fluff to generate targeted notes of exactly what will be on the test.</p>
+          <div class="lp-benefit-card__meta">Mechanism: Instant Topic Compression</div>
+        </div>
+        <div class="lp-benefit-card">
+          <div class="lp-benefit-card__icon">🧠</div>
+          <h3 class="lp-benefit-card__title">Never Go Blank Again</h3>
+          <p class="lp-benefit-card__desc"><strong>Make Memory Permanent.</strong> AI automatically converts your notes into spaced-repetition flashcards so forgetting is impossible.</p>
+          <div class="lp-benefit-card__meta">Mechanism: Active-Recall Flashcards</div>
+        </div>
+        <div class="lp-benefit-card">
+          <div class="lp-benefit-card__icon">🎯</div>
+          <h3 class="lp-benefit-card__title">Train Like You Fight</h3>
+          <p class="lp-benefit-card__desc"><strong>Hack the actual test.</strong> Generate infinite, hyper-realistic practice questions and full mock exams instantly.</p>
+          <div class="lp-benefit-card__meta">Mechanism: Dynamic Mock Exams</div>
+        </div>
+        <div class="lp-benefit-card">
+          <div class="lp-benefit-card__icon">🔥</div>
+          <h3 class="lp-benefit-card__title">Kill Procrastination</h3>
+          <p class="lp-benefit-card__desc"><strong>Stay Consistent.</strong> Built-in study tracking and focus dashboards make sitting down to study the easiest part of your day.</p>
+          <div class="lp-benefit-card__meta">Mechanism: Focus Dashboard</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. How It Works -->
+    <section class="lp-how">
+      <h2 class="lp-section-title">From Panic to Prepared in 3 Steps</h2>
+      <div class="lp-how__steps">
+        <div class="lp-how-step">
+          <div class="lp-how-step__num">1</div>
+          <h4 class="lp-how-step__title">Feed the Engine</h4>
+          <p class="lp-how-step__desc">Select your class or upload material.</p>
+        </div>
+        <div class="lp-how-step">
+          <div class="lp-how-step__num">2</div>
+          <h4 class="lp-how-step__title">Extract the Gold</h4>
+          <p class="lp-how-step__desc">AI generates custom summary notes, flashcards, and mind maps.</p>
+        </div>
+        <div class="lp-how-step">
+          <div class="lp-how-step__num">3</div>
+          <h4 class="lp-how-step__title">Test and Destroy</h4>
+          <p class="lp-how-step__desc">Take mock exams. We grade you and explain your mistakes.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Product Experience -->
+    <section class="lp-experience">
+      <div class="lp-split">
+        <div class="lp-split__col lp-split__col--bad">
+          <h3>The Old Way:</h3>
+          <ul>
+            <li>❌ 5 hours reading a single chapter</li>
+            <li>❌ Endlessly highlighting everything</li>
+            <li>❌ Forgetting facts under pressure</li>
+            <li>❌ Constant overwhelming study anxiety</li>
+          </ul>
+        </div>
+        <div class="lp-split__col lp-split__col--good">
+          <h3>The NotesGPT Way:</h3>
+          <ul>
+            <li>✅ 15 minutes reviewing AI summaries</li>
+            <li>✅ Flawless memory via active flashcards</li>
+            <li>✅ Testing yourself with generated mock exams</li>
+            <li>✅ Walking into the hall with quiet confidence</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. Competitor Comparison -->
+    <section class="lp-compare">
+      <h2 class="lp-section-title">The right tool for a specific job.</h2>
+      <div class="lp-compare__table-wrap">
+        <table class="lp-compare__table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>NotesGPT</th>
+              <th>ChatGPT</th>
+              <th>YouTube</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Built strictly for passing exams</td>
+              <td>✅ Yes</td>
+              <td class="muted">❌ Generic AI</td>
+              <td class="muted">❌ Distracting</td>
+            </tr>
+            <tr>
+              <td>Auto-generates Mock Exams</td>
+              <td>✅ Yes</td>
+              <td class="muted">❌ Cumbersome</td>
+              <td class="muted">❌ No</td>
+            </tr>
+            <tr>
+              <td>Syllabus & Curriculum Aligned</td>
+              <td>✅ Yes</td>
+              <td class="muted">❌ Hallucinates</td>
+              <td class="muted">❌ Hit or Miss</td>
+            </tr>
+            <tr>
+              <td>Creates Flashcards & Mindmaps</td>
+              <td>✅ Yes</td>
+              <td class="muted">❌ Text only</td>
+              <td class="muted">❌ No</td>
+            </tr>
+            <tr>
+              <td>Distraction-Free Environment</td>
+              <td>✅ Yes</td>
+              <td class="muted">❌ Prone to tangents</td>
+              <td class="muted">❌ Algorithm traps</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 9. Social Proof -->
+    <section class="lp-proof">
+      <h2 class="lp-section-title">The grades speak for themselves.</h2>
+      <div class="lp-proof__grid">
+        <div class="lp-testimonial">
+          <p>"I used to spend 4 hours a night copying biology notes. NotesGPT summarized the chapter in 30 seconds and gave me 50 practice questions. I scored a 94 on my midterm while studying half as much."</p>
+          <div class="lp-testimonial__author">— Aryan K., Grade 11</div>
+        </div>
+        <div class="lp-testimonial">
+          <p>"The flashcards and mock exams feel like I have a cheat sheet of what the teacher is going to ask. Easiest A in Chemistry I've ever gotten."</p>
+          <div class="lp-testimonial__author">— Priya S., Grade 12</div>
+        </div>
+        <div class="lp-testimonial">
+          <p>"It stops my procrastination. You just click your chapter and everything you need to do is right there. No setup required."</p>
+          <div class="lp-testimonial__author">— David R., College Freshman</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. Feature Layer -->
+    <section class="lp-features">
+      <h2 class="lp-section-title">Everything you need. Nothing you don't.</h2>
+      <ul class="lp-features__list">
+        <li><strong>AI Note Generation:</strong> Instantly convert topics into digestible, syllabus-aligned notes.</li>
+        <li><strong>Infinite Mock Exams:</strong> Generate MCQs, short-answer, and long-answer questions.</li>
+        <li><strong>Doubt Solver:</strong> Ask a question, get an instant, verified explanation.</li>
+        <li><strong>Audio & Visual Learning:</strong> Listen to your notes as podcasts or view them as mind maps.</li>
+        <li><strong>Cloud History:</strong> Your entire study progression, saved and accessible anywhere.</li>
+        <li><strong>Focus Environment:</strong> Dark mode aesthetics with built-in lo-fi study beats.</li>
+      </ul>
+    </section>
+
+    <!-- 11. Final CTA -->
+    <section class="lp-final-cta">
+      <div class="lp-final-cta__content">
+        <h2>The exam is coming. Your competitors are already studying.</h2>
+        <p>Stop wasting time with passive reading. Build your hyper-targeted study pack in the next 60 seconds.</p>
+        <button class="btn lp-cta-btn lp-cta-btn--glow" id="footer-start-btn">Start Crushing Exams Now</button>
+        <p class="lp-final-cta__sub">Setup takes less than 30 seconds. No credit card required. Experience the 'Aha!' moment on your first search.</p>
+      </div>
+    </section>
+
+    <!-- 12. FAQ -->
+    <section class="lp-faq">
+      <h2 class="lp-section-title">Frequently Asked Questions</h2>
+      <div class="lp-faq__list">
+        <details class="lp-faq__item">
+          <summary>Is it accurate to my actual syllabus?</summary>
+          <div class="lp-faq__ans">Yes. NotesGPT is designed to align strictly with CBSE standards (Class 6-12) and avoids the "hallucinations" of generic AI chatbots by focusing specifically on verified curriculum structures.</div>
+        </details>
+        <details class="lp-faq__item">
+          <summary>How does it actually save me time?</summary>
+          <div class="lp-faq__ans">By eliminating the manual labor of studying. Instead of spending 3 hours writing flashcards or making notes, NotesGPT generates them instantly. You spend 100% of your time actually learning.</div>
+        </details>
+        <details class="lp-faq__item">
+          <summary>Do I need a credit card to try it?</summary>
+          <div class="lp-faq__ans">No. You can jump in as a Guest and generate your first study pack immediately.</div>
+        </details>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════
+       APP VIEW (Hidden by default)
+       ═══════════════════════════════════════ -->
+  <div id="app-view" class="hidden">
+    <main class="container">
+
+    <!-- ═══ Flow Stepper ═══ -->
+    <div class="flow-stepper hidden" id="flow-stepper">
+      <div class="flow-step" id="step-learn"><div class="flow-step__icon">1</div><span class="flow-step__label">Learn</span></div>
+      <div class="flow-divider"></div>
+      <div class="flow-step" id="step-practice"><div class="flow-step__icon">2</div><span class="flow-step__label">Practice</span></div>
+      <div class="flow-divider"></div>
+      <div class="flow-step" id="step-fix"><div class="flow-step__icon">3</div><span class="flow-step__label">Fix</span></div>
+      <div class="flow-divider"></div>
+      <div class="flow-step" id="step-revise"><div class="flow-step__icon">4</div><span class="flow-step__label">Revise</span></div>
+      <div class="flow-divider"></div>
+      <div class="flow-step" id="step-master"><div class="flow-step__icon">5</div><span class="flow-step__label">Master</span></div>
+    </div>
+
+    <!-- ═══ 2-Column App Layout ═══ -->
+    <div class="app-layout">
+      <!-- ═══ Sidebar (Persistent) ═══ -->
+      <aside class="app-sidebar clean-card" id="app-sidebar">
+        <button class="btn btn--primary dash-new-btn" id="dash-new-btn">+ Study New Chapter</button>
+      </aside>
+
+      <!-- ═══ Main Content Area ═══ -->
+      <div class="app-main">
 
     <!-- ═══ Step 0: Input ═══ -->
     <section class="card card--input" id="input-section">
@@ -67,8 +352,15 @@
           </div>
         </div>
         <div class="form-group">
-          <label for="chapter-input">Chapter Name</label>
-          <input type="text" id="chapter-input" placeholder="e.g. Real Numbers, Chemical Reactions..." required />
+          <label for="chapter-select">Chapter Name</label>
+          <select id="chapter-select" required disabled>
+            <option value="" disabled selected>Select class and subject first</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="topic-input">🔍 Focus on a specific topic <span style="font-weight:400;color:var(--text-muted);font-size:0.78rem;">(optional)</span></label>
+          <input type="text" id="topic-input" class="form-input" placeholder="e.g. Ohm's Law, Photosynthesis, Quadratic Equations..." autocomplete="off">
+          <p class="form-hint">Leave empty to study the whole chapter</p>
         </div>
         <button type="submit" id="submit-btn" class="btn btn--primary">
           <span class="btn__text">Generate Notes</span>
@@ -76,6 +368,20 @@
         </button>
       </form>
       <p class="error-msg" id="error-msg"></p>
+    </section>
+
+
+    <!-- ═══ Review Section (Resume from History) ═══ -->
+    <section class="card card--review hidden" id="review-section">
+      <div class="review-header">
+        <h2 class="review-header__title" id="review-title">📖 Review Session</h2>
+        <button class="btn btn--secondary btn--sm" id="review-close-btn">✕ Close</button>
+      </div>
+      <div class="review-content" id="review-content"></div>
+      <div class="review-actions">
+        <button class="btn btn--accent" id="review-practice-btn">📋 Practice This Chapter Again</button>
+        <button class="btn btn--outline" id="review-revise-btn">🔄 Start Revision</button>
+      </div>
     </section>
 
     <!-- ═══ Loading (Notes) ═══ -->
@@ -97,31 +403,10 @@
       </div>
       <div class="notes-content" id="notes-content"></div>
       <div class="output__actions">
-        <button class="btn btn--accent" id="mindmap-btn">🗺️ View Chapter Mind Map</button>
-        <button class="btn btn--secondary" id="flashcard-btn">🔒 Lock Memory → Flashcards</button>
+        <button class="btn btn--accent" id="flashcard-btn">Continue → Flashcards 🔒</button>
       </div>
     </section>
 
-    <!-- ═══ Loading (Mind Map) ═══ -->
-    <section class="card card--loading hidden" id="mindmap-loading">
-      <div class="loader"><div class="loader__spinner"></div>
-        <p class="loader__text">Generating mind map<span class="dots"></span></p>
-        <p class="loader__sub">Mapping chapter structure…</p>
-      </div>
-    </section>
-
-    <!-- ═══ Mind Map View ═══ -->
-    <section class="card card--mindmap hidden" id="mindmap-section">
-      <div class="mm-header">
-        <h2 class="mm-header__title" id="mindmap-title">Chapter Map</h2>
-        <div class="mm-header__actions">
-          <button class="btn btn--outline btn--sm" id="mindmap-dl-png">🖼️ PNG</button>
-          <button class="btn btn--outline btn--sm" id="mindmap-dl-pdf">📄 PDF</button>
-        </div>
-      </div>
-      <div class="mm-canvas" id="mindmap-canvas"></div>
-      <button class="btn btn--accent" id="mindmap-back-btn">Continue → Flashcards 🔒</button>
-    </section>
 
     <!-- ═══ Loading (Flashcards) ═══ -->
     <section class="card card--loading hidden" id="flashcard-loading">
@@ -274,68 +559,9 @@
       <div class="card card--complete">
         <div class="complete">
           <div class="complete__actions">
-            <button class="btn btn--accent btn--lg" id="test-fix-btn">🔧 Fix Mistakes & Practice Weak Points →</button>
-            <button class="btn btn--outline" id="test-video-btn">🎬 Watch Video Help</button>
-            <button class="btn btn--secondary" id="test-retry-btn">🔄 Review & Retry</button>
+            <button class="btn btn--accent btn--lg" id="test-fix-btn">🔧 Fix Mistakes & Improve →</button>
             <button class="btn btn--secondary" id="test-new-notes-btn">📝 New Notes</button>
           </div>
-        </div>
-      </div>
-
-      <!-- Audio Learning (after scores) -->
-      <div class="audio-section hidden" id="audio-section">
-        <div class="audio-header">
-          <h3 class="audio-header__title">🎧 Audio Revision</h3>
-          <div class="audio-modes">
-            <button class="btn btn--accent btn--sm" id="audio-quick-btn">🎧 Quick Listen</button>
-            <button class="btn btn--outline btn--sm" id="audio-podcast-btn">🎙 Podcast Mode</button>
-          </div>
-        </div>
-        <div class="audio-gen-loading hidden" id="audio-gen-loading">
-          <div class="loader__spinner" style="width:20px;height:20px;border-width:2px;margin:0 auto 6px;"></div>
-          <p style="font-size:0.82rem;color:var(--text-muted);text-align:center;">Generating audio script…</p>
-        </div>
-        <div class="audio-player hidden" id="audio-player">
-          <span class="audio-mode-label" id="audio-mode-label">🎧 Quick</span>
-          <button class="audio-play-btn" id="audio-play-btn">▶</button>
-          <div class="audio-progress">
-            <div class="audio-progress__bar"><div class="audio-progress__fill" id="audio-progress-fill"></div></div>
-          </div>
-          <span class="audio-time" id="audio-time">~2 min</span>
-          <button class="audio-speed-btn" id="audio-speed-btn">1x</button>
-        </div>
-        <p class="audio-char-label" id="audio-char-label" style="display:none;"></p>
-      </div>
-
-      <!-- Music Generation (after scores) -->
-      <div class="music-section" id="music-section">
-        <div class="music-header">
-          <h3 class="music-header__title">🎵 Memory Song</h3>
-          <span class="music-style-badge" id="music-style-badge"></span>
-        </div>
-        <button class="btn btn--accent" id="music-gen-btn">🎵 Generate Memory Song</button>
-
-        <div class="music-loading hidden" id="music-loading">
-          <div class="loader__spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;"></div>
-          <p class="music-loading__text">Composing your song…</p>
-          <p class="music-loading__sub">This may take up to a minute</p>
-        </div>
-
-        <div class="music-error hidden" id="music-error">
-          <p class="music-error__msg">Something went wrong.</p>
-          <button class="btn btn--outline btn--sm" id="music-retry-btn">🔄 Retry</button>
-        </div>
-
-        <div class="music-player-wrap hidden" id="music-player-wrap">
-          <audio id="music-audio" preload="auto"></audio>
-          <div class="music-controls">
-            <button class="music-play-btn" id="music-play-btn">▶</button>
-            <div class="music-progress">
-              <div class="music-progress__bar"><div class="music-progress__fill" id="music-progress-fill"></div></div>
-            </div>
-            <span class="music-time" id="music-time">0:00 / 0:00</span>
-          </div>
-          <div class="music-lyrics" id="music-lyrics"></div>
         </div>
       </div>
     </section>
@@ -398,34 +624,239 @@
       </div>
     </section>
 
-    <!-- ═══ Step 5: Correction Complete ═══ -->
+    <!-- ═══ Correction Complete → Unlock ═══ -->
     <section class="card card--complete hidden" id="retry-complete">
       <div class="complete">
         <div class="complete__icon">💪</div>
-        <h2 class="complete__title">Correction Complete!</h2>
+        <h2 class="complete__title">Improvement Complete!</h2>
         <p class="complete__sub">You've reviewed your mistakes and practiced weak areas.</p>
         <div class="complete__stats" id="retry-stats"></div>
         <div class="complete__actions">
-          <button class="btn btn--accent" id="retry-dash-btn">📊 Back to Dashboard</button>
-          <button class="btn btn--secondary" id="retry-new-btn">📝 Study New Chapter</button>
+          <button class="btn btn--accent btn--lg" id="retry-unlock-btn">🏆 Unlock Achievement →</button>
         </div>
       </div>
     </section>
 
-    <!-- ═══ Video Help (shared section) ═══ -->
-    <section class="card card--video hidden" id="video-help-section">
-      <div class="vid-header">
-        <h3 class="vid-header__title">🎬 Video Help</h3>
-        <button class="doubt-modal__close" id="video-close">✕</button>
+    <!-- ═══ Step 7: Unlock Achievement ═══ -->
+    <section class="card card--complete hidden" id="unlock-section">
+      <div class="complete">
+        <div class="complete__icon" style="font-size:4rem;animation:pulse 1.5s ease-in-out infinite;">🏆</div>
+        <h2 class="complete__title" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Chapter Mastered!</h2>
+        <p class="complete__sub">You've completed the full learning cycle for this chapter. Time to cement your knowledge!</p>
+        <div class="complete__stats" id="unlock-stats"></div>
+        <div class="complete__actions">
+          <button class="btn btn--accent btn--lg" id="unlock-mindmap-btn">🗺️ Continue → Mind Map</button>
+        </div>
       </div>
-      <div class="vid-loading hidden" id="video-loading">
-        <div class="loader__spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;"></div>
-        <p style="font-size:0.85rem;color:var(--text-muted);text-align:center;">Finding best videos…</p>
-      </div>
-      <div class="vid-cards" id="video-cards"></div>
     </section>
 
+    <!-- ═══ Step 8: Mind Map (Loading) ═══ -->
+    <section class="card card--loading hidden" id="mindmap-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Generating mind map<span class="dots"></span></p>
+        <p class="loader__sub">Mapping chapter structure…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 8: Mind Map View ═══ -->
+    <section class="card card--mindmap hidden" id="mindmap-section">
+      <div class="mm-header">
+        <h2 class="mm-header__title" id="mindmap-title">Chapter Map</h2>
+        <div class="mm-header__actions">
+          <button class="btn btn--outline btn--sm" id="mindmap-dl-png">🖼️ PNG</button>
+          <button class="btn btn--outline btn--sm" id="mindmap-dl-pdf">📄 PDF</button>
+        </div>
+      </div>
+      <div class="mm-canvas" id="mindmap-canvas"></div>
+      <button class="btn btn--accent" id="mindmap-continue-btn">Continue → Audio Book 🎧</button>
+    </section>
+
+    <!-- ═══ Step 9: Audio Book ═══ -->
+    <section class="card hidden" id="audiobook-section">
+      <div class="audio-header">
+        <h3 class="audio-header__title">🎧 Audio Book — Listen to Your Summary</h3>
+      </div>
+      <button class="btn btn--accent" id="audio-quick-btn">▶ Generate & Listen</button>
+      <div class="audio-gen-loading hidden" id="audio-gen-loading">
+        <div class="loader__spinner" style="width:20px;height:20px;border-width:2px;margin:0 auto 6px;"></div>
+        <p style="font-size:0.82rem;color:var(--text-muted);text-align:center;">Generating audio script…</p>
+      </div>
+      <div class="audio-player hidden" id="audio-player">
+        <span class="audio-mode-label" id="audio-mode-label">🎧 Quick Listen</span>
+        <button class="audio-play-btn" id="audio-play-btn">▶</button>
+        <div class="audio-progress">
+          <div class="audio-progress__bar"><div class="audio-progress__fill" id="audio-progress-fill"></div></div>
+        </div>
+        <span class="audio-time" id="audio-time">~2 min</span>
+        <button class="audio-speed-btn" id="audio-speed-btn">1x</button>
+      </div>
+      <p class="audio-char-label" id="audio-char-label" style="display:none;"></p>
+      <button class="btn btn--accent" id="audiobook-continue-btn" style="margin-top:16px;">Continue → AI Video 🎬</button>
+    </section>
+
+    <!-- ═══ Step 10: AI Video Generation ═══ -->
+    <section class="card hidden" id="aivideo-section">
+      <div class="aivideo-header">
+        <h3 class="aivideo-header__title">🎬 AI Video — Visual Explanation</h3>
+      </div>
+      <p class="aivideo-desc">AI generates multiple short video clips explaining key concepts, then combines them into one visual learning experience.</p>
+      <button class="btn btn--accent" id="aivideo-gen-btn">🎬 Generate Explanatory Video</button>
+      <div class="aivideo-loading hidden" id="aivideo-loading">
+        <div class="loader__spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;"></div>
+        <p style="font-size:0.85rem;color:var(--text-muted);text-align:center;">Generating AI video clips… This takes 2-4 minutes.</p>
+        <p style="font-size:0.75rem;color:var(--text-muted);text-align:center;margin-top:4px;">AI is creating multiple scenes and rendering each one.</p>
+      </div>
+      <div class="aivideo-error hidden" id="aivideo-error">
+        <p class="aivideo-error__msg">Video generation unavailable. Opening YouTube instead…</p>
+      </div>
+      <div class="aivideo-player hidden" id="aivideo-player">
+        <!-- Playlist player is dynamically injected by aivideo.js -->
+      </div>
+      <button class="btn btn--accent" id="aivideo-continue-btn" style="margin-top:16px;">Continue → Memory Song 🎵</button>
+    </section>
+
+    <!-- ═══ Loading (Arena) ═══ -->
+    <section class="card card--loading hidden" id="arena-loading">
+      <div class="loader"><div class="loader__spinner"></div>
+        <p class="loader__text">Entering Exam Arena<span class="dots"></span></p>
+        <p class="loader__sub">Loading high-stakes challenges…</p>
+      </div>
+    </section>
+
+    <!-- ═══ Step 12: Exam Arena Game ═══ -->
+    <section class="card card--arena hidden" id="arena-section">
+      <div class="arena-hud">
+        <div class="arena-progress">
+          <div class="arena-progress__bar"><div class="arena-progress__fill" id="arena-progress-fill"></div></div>
+          <span class="arena-progress__text" id="arena-progress-text">1 / 10</span>
+        </div>
+        <div class="arena-stats">
+          <div class="arena-stat">
+            <span class="arena-stat__label">SCORE</span>
+            <span class="arena-stat__value" id="arena-score">0</span>
+          </div>
+          <div class="arena-stat">
+            <span class="arena-stat__label">STREAK</span>
+            <span class="arena-stat__value" id="arena-streak">🔥 0</span>
+          </div>
+        </div>
+        <div class="arena-timer">
+          <svg class="arena-timer__svg" viewBox="0 0 100 100">
+            <circle class="arena-timer__bg" cx="50" cy="50" r="45"></circle>
+            <circle class="arena-timer__fill" id="arena-timer-fill" cx="50" cy="50" r="45"></circle>
+          </svg>
+          <span class="arena-timer__text" id="arena-timer-text">8</span>
+        </div>
+      </div>
+
+      <div class="arena-main">
+        <div class="arena-q">
+          <span class="arena-q__badge" id="arena-q-type">CONCEPT RECOGNITION</span>
+          <h2 class="arena-q__text" id="arena-q-text">Loading question…</h2>
+        </div>
+        <div class="arena-choices" id="arena-choices">
+          <!-- Choice buttons injected by arena.js -->
+        </div>
+      </div>
+
+      <div class="arena-feedback hidden" id="arena-feedback">
+        <div class="arena-feedback__content">
+          <span class="arena-feedback__icon" id="arena-feedback-icon"></span>
+          <p class="arena-feedback__msg" id="arena-feedback-msg"></p>
+          <p class="arena-feedback__insight" id="arena-feedback-insight"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Step 12: Arena Results ═══ -->
+    <section class="card card--arena-results hidden" id="arena-results">
+      <div class="arena-results__header">
+        <h2 class="arena-results__title">Arena Results</h2>
+        <div class="arena-big-score">
+          <span class="arena-big-score__val" id="arena-final-score">0</span>
+          <span class="arena-big-score__label">Performance Score</span>
+        </div>
+      </div>
+
+      <div class="arena-metrics">
+        <div class="arena-metric">
+          <span class="arena-metric__label">Accuracy</span>
+          <span class="arena-metric__val" id="arena-final-accuracy">0%</span>
+        </div>
+        <div class="arena-metric">
+          <span class="arena-metric__label">Max Streak</span>
+          <span class="arena-metric__val" id="arena-final-streak">0</span>
+        </div>
+        <div class="arena-metric">
+          <span class="arena-metric__label">Speed Rating</span>
+          <span class="arena-metric__val" id="arena-final-speed">FLASH</span>
+        </div>
+      </div>
+
+      <div class="arena-insight-box">
+        <h4 class="arena-insight-box__title">🧠 Strategic Insight</h4>
+        <p class="arena-insight-box__text" id="arena-final-insight"></p>
+      </div>
+
+      <div class="arena-results__actions">
+        <button class="btn btn--accent btn--lg" id="arena-retry-btn">⚔️ Play Again</button>
+        <button class="btn btn--primary" id="arena-continue-btn">Continue to Dashboard</button>
+      </div>
+    </section>
+
+    <!-- ═══ Step 11: Song Generation ═══ -->
+    <section class="card hidden" id="song-section">
+      <div class="music-header">
+        <h3 class="music-header__title">🎵 Memory Song — Lock It In!</h3>
+        <span class="music-style-badge" id="music-style-badge"></span>
+      </div>
+      <button class="btn btn--accent" id="music-gen-btn">🎵 Generate Memory Song</button>
+      <div class="music-loading hidden" id="music-loading">
+        <div class="loader__spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;"></div>
+        <p class="music-loading__text">Composing your song…</p>
+        <p class="music-loading__sub">This may take up to a minute</p>
+      </div>
+      <div class="music-error hidden" id="music-error">
+        <p class="music-error__msg">Something went wrong.</p>
+        <button class="btn btn--outline btn--sm" id="music-retry-btn">🔄 Retry</button>
+      </div>
+      <div class="music-player-wrap hidden" id="music-player-wrap">
+        <audio id="music-audio" preload="auto"></audio>
+        <div class="music-controls">
+          <button class="music-play-btn" id="music-play-btn">▶</button>
+          <div class="music-progress">
+            <div class="music-progress__bar"><div class="music-progress__fill" id="music-progress-fill"></div></div>
+          </div>
+          <span class="music-time" id="music-time">0:00 / 0:00</span>
+        </div>
+        <div class="music-lyrics" id="music-lyrics"></div>
+      </div>
+      <div class="complete__actions" style="margin-top:20px;">
+        <button class="btn btn--accent btn--lg" id="song-complete-btn">🎯 Final Step: Enter Exam Arena</button>
+      </div>
+    </section>
+
+    <!-- ═══ Study History (Below All Generations) ═══ -->
+    <section class="card card--history" id="hist-section-wrap">
+      <div class="hist-section" id="hist-section">
+        <div class="hist-header">
+          <h3 class="hist-header__title">📚 Study History</h3>
+          <button class="btn btn--outline btn--sm" id="hist-clear-btn">Clear</button>
+        </div>
+        <div class="hist-list" id="hist-list"></div>
+      </div>
+    </section>
+
+      </div> <!-- End app-main -->
+    </div> <!-- End app-layout -->
+
     <footer class="footer">
+      <div class="footer-nav">
+        <a href="how-it-works.html">How It Works</a>
+        <a href="about.html">About</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+      </div>
       <p>Built with ❤️ for CBSE students &bull; Powered by AI</p>
     </footer>
   </main>
@@ -463,7 +894,96 @@
     </div>
   </div>
 
+  <!-- End app-view -->
+  </div>
+
+  <!-- ═══ Guest Mode Banner ═══ -->
+  <div class="guest-banner hidden" id="guest-banner">
+    <span class="guest-banner__icon">👤</span>
+    <span class="guest-banner__text">You're in guest mode. Sign in to save your study progress across devices.</span>
+    <button class="btn btn--outline btn--sm" id="guest-signin-btn">Sign In</button>
+  </div>
+
+  <!-- ═══ Auth Modal ═══ -->
+  <div class="auth-overlay hidden" id="auth-overlay">
+    <div class="auth-modal" id="auth-modal">
+      <button class="auth-modal__close" id="auth-close">✕</button>
+      <div class="auth-modal__header">
+        <div class="auth-logo">
+          <img src="assets/logo.svg" alt="NotesGPT" class="auth-logo-img">
+          <span>Notes<span class="accent">GPT</span></span>
+        </div>
+        <p class="auth-modal__sub">Sign in to save your progress</p>
+      </div>
+
+      <!-- Google Sign-In -->
+      <button class="auth-google-btn" id="auth-google-btn">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        <span>Continue with Google</span>
+      </button>
+
+      <div class="auth-divider"><span>or</span></div>
+
+      <!-- Tab Switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab auth-tab--active" data-tab="signin">Sign In</button>
+        <button class="auth-tab" data-tab="signup">Sign Up</button>
+      </div>
+
+      <!-- Sign-In Form -->
+      <form class="auth-form" id="auth-form-signin">
+        <div id="signin-form">
+          <div class="auth-field">
+            <label for="signin-email">Email</label>
+            <input type="email" id="signin-email" placeholder="you@example.com" required autocomplete="email" />
+          </div>
+          <div class="auth-field">
+            <label for="signin-password">Password</label>
+            <input type="password" id="signin-password" placeholder="Your password" required autocomplete="current-password" />
+          </div>
+          <button type="submit" class="btn btn--primary auth-submit-btn">Sign In</button>
+          <a href="#" class="auth-forgot" id="auth-forgot-btn">Forgot password?</a>
+        </div>
+      </form>
+
+      <!-- Sign-Up Form -->
+      <form class="auth-form hidden" id="auth-form-signup">
+        <div id="signup-form">
+          <div class="auth-field">
+            <label for="signup-name">Full Name</label>
+            <input type="text" id="signup-name" placeholder="Your name" autocomplete="name" />
+          </div>
+          <div class="auth-field">
+            <label for="signup-email">Email</label>
+            <input type="email" id="signup-email" placeholder="you@example.com" required autocomplete="email" />
+          </div>
+          <div class="auth-field">
+            <label for="signup-password">Password</label>
+            <input type="password" id="signup-password" placeholder="Min 6 characters" required minlength="6" autocomplete="new-password" />
+          </div>
+          <div class="auth-field">
+            <label for="signup-confirm">Confirm Password</label>
+            <input type="password" id="signup-confirm" placeholder="Repeat password" required minlength="6" autocomplete="new-password" />
+          </div>
+          <button type="submit" class="btn btn--primary auth-submit-btn">Create Account</button>
+        </div>
+      </form>
+
+      <!-- Error / Success messages -->
+      <p class="auth-error" id="auth-error-msg" style="display:none;"></p>
+      <p class="auth-success" id="auth-success-msg" style="display:none;"></p>
+
+      <!-- Guest Option -->
+      <button class="auth-guest-btn" id="auth-modal-guest-btn">Continue as Guest (Progress won't be saved)</button>
+    </div>
+  </div>
+
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/data.js"></script>
   <script src="/js/tracker.js"></script>
   <script src="/js/history.js"></script>
   <script src="/js/app.js"></script>
@@ -475,6 +995,9 @@
   <script src="/js/mindmap.js"></script>
   <script src="/js/audio.js"></script>
   <script src="/js/music.js"></script>
+  <script src="/js/aivideo.js"></script>
   <script src="/js/doubt.js"></script>
+  <script src="/js/legendary.js"></script>
+  <script src="/js/arena.js"></script>
 </body>
 </html>
