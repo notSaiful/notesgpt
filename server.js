@@ -1284,145 +1284,51 @@ app.post("/api/generate-audio-script", async (req, res) => {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
 
-    const bytezKey = process.env.BYTEZ_API_KEY;
-    if (!bytezKey) return res.status(500).json({ error: "Bytez API key not configured." });
+    // ── Generate a clean, natural narration script via AI ──
+    const systemMsg = "You are a friendly, engaging CBSE teacher narrating a lesson. Output ONLY the spoken script — plain conversational sentences. No markdown, no bullet points, no headings, no special characters.";
+    const prompt = `Convert the following study notes into a natural spoken narration script for a Class ${classNum || 10} ${subject || "Science"} student.
 
-    // ── Step 1: Generate spoken script via OpenRouter ──
-    const systemMsg = "You are a CBSE teacher. Convert study notes into a clear, spoken audio script. Output ONLY the script text, no formatting.";
-    const prompt = `You are a CBSE teacher explaining a chapter to a Class ${classNum || 10} student.
-
-Subject: ${subject || "General"}
-Chapter: ${chapter}
-
-Convert the following summary into a spoken audio script.
+Chapter: "${chapter}"
 
 Rules:
-- Keep it concise (2-3 minutes when spoken, about 300-400 words)
-- Use simple spoken language, as if talking to the student directly
-- Focus on key concepts, formulas, and exam points
-- Avoid headings, bullet points, or markdown
-- Make it sound natural when spoken aloud
-- Use transitions like "Now let's talk about..." or "Remember that..."
-- Add pauses with "..." for emphasis
+- Write ONLY what would be spoken aloud — plain sentences only
+- Speak directly to the student: use "you" and "we"
+- Use transitions: "Now let's look at...", "The important thing here is...", "Remember that..."
+- Keep it to 300-450 words (about 3 minutes spoken at normal pace)
+- Emphasize exam points naturally: "This is very important for your exam..."
+- Use comma placement for natural breathing rhythm
+- End with: "Good luck with your exam. You've got this."
 
-Summary:
-${summaryText.slice(0, 3000)}
+Notes:
+${summaryText.slice(0, 4000)}
 
-Output a clean spoken script, nothing else.`;
+Output ONLY the spoken script. Nothing else.`;
 
     const raw = await callOpenRouter(apiKey, systemMsg, prompt, 2000);
-    if (!raw) {
-      return res.status(502).json({ error: "AI temporarily busy." });
-    }
 
-    let script = raw
+    // Clean any residual markdown
+    const cleanScript = (text) => text
+      .replace(/#{1,6}\s*/g, "")
       .replace(/\*\*/g, "").replace(/\*/g, "")
-      .replace(/#/g, "").replace(/[-•]/g, "")
+      .replace(/[-•]\s+/g, "")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
+    if (!raw) {
+      // Fallback: clean up the notes text itself for TTS
+      const fallback = cleanScript(summaryText);
+      return res.json({ script: fallback, wordCount: fallback.split(/\s+/).length, type: "text-only" });
+    }
+
+    const script = cleanScript(raw);
     const wordCount = script.split(/\s+/).length;
-    console.log(`🎧 Generated audiobook script: ~${wordCount} words`);
-
-    // ── Step 2: Split into chunks for Bark (max ~200 chars each for best quality) ──
-    const sentences = script.match(/[^.!?]+[.!?]+/g) || [script];
-    const textChunks = [];
-    let current = "";
-    for (const sentence of sentences) {
-      if ((current + sentence).length > 180 && current) {
-        textChunks.push(current.trim());
-        current = sentence;
-      } else {
-        current += sentence;
-      }
-    }
-    if (current.trim()) textChunks.push(current.trim());
-
-    console.log(`🎤 Splitting into ${textChunks.length} chunks for Bark TTS...`);
-
-    // ── Step 3: Generate audio for each chunk via Bytez suno/bark ──
-    const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    
-    const audioChunks = [];
-    for (let i = 0; i < textChunks.length; i++) {
-      try {
-        console.log(`  🔊 Chunk ${i + 1}/${textChunks.length}: "${textChunks[i].slice(0, 40)}..."`);
-        
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 120000); // 2 min per chunk
-
-        const barkRes = await fetch("https://api.bytez.com/models/v2/suno/bark", {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": bytezKey,
-          },
-          body: JSON.stringify({ text: textChunks[i] }),
-        });
-
-        clearTimeout(timeout);
-
-        if (!barkRes.ok) {
-          console.warn(`  ⚠️ Chunk ${i + 1} failed (${barkRes.status})`);
-          continue;
-        }
-
-        const barkData = await barkRes.json();
-        if (!barkData.output) {
-          console.warn(`  ⚠️ Chunk ${i + 1}: no output`);
-          continue;
-        }
-
-        // Save WAV chunk
-        const filename = `audiobook_${sessionId}_${i}.wav`;
-        const filePath = path.join(AUDIO_DIR, filename);
-        const audioBuffer = Buffer.from(barkData.output, "base64");
-        fs.writeFileSync(filePath, audioBuffer);
-
-        audioChunks.push({
-          url: `/audio/${filename}`,
-          text: textChunks[i],
-          index: i,
-        });
-
-        console.log(`  ✅ Chunk ${i + 1} saved (${Math.round(audioBuffer.length / 1024)}KB)`);
-      } catch (chunkErr) {
-        console.warn(`  ⚠️ Chunk ${i + 1} error: ${chunkErr.message}`);
-      }
-    }
-
-    if (audioChunks.length === 0) {
-      // Fallback: return script only, frontend can use browser TTS
-      return res.json({
-        script,
-        mode: "quick",
-        wordCount,
-        estimatedMinutes: Math.ceil(wordCount / 140),
-        audioChunks: [],
-        type: "text-only",
-      });
-    }
-
-    console.log(`🎧 Audiobook ready: ${audioChunks.length}/${textChunks.length} chunks`);
-
-    // Clean up old audiobook files
-    try {
-      const allFiles = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("audiobook_"));
-      if (allFiles.length > 60) {
-        const sorted = allFiles.sort();
-        const toDelete = sorted.slice(0, sorted.length - 60);
-        toDelete.forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
-      }
-    } catch {}
+    console.log(`🎧 Audiobook script ready: ~${wordCount} words`);
 
     return res.json({
       script,
-      mode: "quick",
       wordCount,
       estimatedMinutes: Math.ceil(wordCount / 140),
-      audioChunks,
-      type: "bark-audio",
+      type: "text-only",
     });
   } catch (err) {
     console.error("Audiobook error:", err);
