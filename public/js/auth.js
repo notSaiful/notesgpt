@@ -188,8 +188,7 @@ const Auth = (() => {
     const profileAvatar = document.getElementById("user-avatar");
     const profileName = document.getElementById("user-display-name");
     const guestBanner = document.getElementById("guest-banner");
-    const dashWelcome = document.getElementById("dash-welcome");
-    const dashUsername = document.getElementById("dash-username");
+    const introUsername = document.getElementById("intro-username");
 
     if (user) {
       // Logged in
@@ -213,15 +212,14 @@ const Auth = (() => {
         }
       }
 
-      if (dashWelcome) dashWelcome.classList.remove("hidden");
-      if (dashUsername) dashUsername.textContent = name;
+      if (introUsername) introUsername.textContent = name;
 
     } else {
       // Logged out / guest
       if (authBtn) authBtn.style.display = "inline-flex";
       if (profileBadge) profileBadge.style.display = "none";
       if (guestBanner && isConfigured) guestBanner.style.display = "flex";
-      if (dashWelcome) dashWelcome.classList.add("hidden");
+      if (introUsername) introUsername.textContent = "Guest";
     }
   }
 

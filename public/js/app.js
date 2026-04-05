@@ -464,25 +464,35 @@ document.addEventListener("DOMContentLoaded", () => {
     
     setTimeout(() => {
       landingView.style.display = "none";
-      appView.classList.remove("hidden");
-      appView.style.opacity = "0";
-      appView.style.animation = "fadeUp 0.6s ease-out forwards";
+      
+      const welcome = document.getElementById("welcome-intro");
+      const appViewIsReady = () => {
+        appView.classList.remove("hidden");
+        appView.style.opacity = "0";
+        appView.style.animation = "fadeUp 0.6s ease-out forwards";
+        window.scrollTo(0, 0);
+      };
 
-      // Wait for app view to be fully visible, then animate welcome
-      setTimeout(() => {
-        const welcome = document.getElementById("dash-welcome");
-        if (welcome && !welcome.classList.contains("hidden")) {
-          welcome.style.opacity = "0";
-          welcome.style.transform = "translateY(-12px)";
-          // Force reflow
-          void welcome.offsetWidth;
-          welcome.style.transition = "opacity 0.5s ease-out, transform 0.5s ease-out";
-          welcome.style.opacity = "1";
-          welcome.style.transform = "translateY(0)";
-        }
-      }, 650);
+      if (welcome) {
+        // Show welcome overlay
+        welcome.classList.remove("hidden");
+        // Force reflow
+        void welcome.offsetWidth;
+        welcome.classList.add("is-active");
+        
+        // Wait 2 seconds, then fade out welcome and fade in app
+        setTimeout(() => {
+          welcome.classList.remove("is-active");
+          
+          setTimeout(() => {
+            welcome.classList.add("hidden");
+            appViewIsReady();
+          }, 800); // Wait for fade out
+        }, 2000);
+      } else {
+        appViewIsReady();
+      }
 
-      window.scrollTo(0, 0);
     }, 400);
   };
 

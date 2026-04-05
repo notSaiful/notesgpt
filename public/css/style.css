@@ -5844,14 +5844,38 @@ a, button, input, select, textarea {
   .chapter-complete { padding: 28px 16px; }
 }
 
-/* ── Dashboard Welcome Message ── */
-.dash-welcome {
+/* ── Full Screen Welcome Intro ── */
+.welcome-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.8s ease-out, visibility 0.8s;
+}
+
+.welcome-intro.is-active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s ease-out;
+}
+
+.welcome-intro__content {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.8rem;
+  font-size: 2.5rem;
   font-weight: 700;
   color: #ffffff;
-  margin: 0 0 24px;
   letter-spacing: -0.02em;
   opacity: 0;
-  transform: translateY(-12px);
+  transform: translateY(20px);
+  transition: opacity 0.8s ease-out 0.2s, transform 0.8s ease-out 0.2s;
+}
+
+.welcome-intro.is-active .welcome-intro__content {
+  opacity: 1;
+  transform: translateY(0);
 }
