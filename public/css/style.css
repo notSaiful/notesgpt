@@ -4657,6 +4657,41 @@ a, button, input, select, textarea {
 .lp-hero__content {
   max-width: 800px;
   z-index: 2;
+  position: relative; /* Ensure it stays above the water rings */
+}
+
+/* ── Water Rings Animation ── */
+.water-rings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1000px;
+  height: 1000px;
+  z-index: 1; /* Below the content */
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.water-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.05);
+  animation: hero-ripple 8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+}
+
+.water-ring--1 { animation-delay: 0s; border-color: rgba(255,255,255,0.08); }
+.water-ring--2 { animation-delay: 2.66s; border-color: rgba(255,255,255,0.12); }
+.water-ring--3 { animation-delay: 5.33s; border-color: rgba(255,255,255,0.16); }
+
+@keyframes hero-ripple {
+  0% { width: 200px; height: 200px; opacity: 0; }
+  20% { opacity: 0.8; }
+  100% { width: 1200px; height: 1200px; opacity: 0; }
 }
 .lp-hero__title {
   font-size: 3.4rem;
