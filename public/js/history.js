@@ -3,21 +3,44 @@
 // ══════════════════════════════════════════════
 
 const History = (() => {
-  const STORAGE_KEY = "notesgpt_history";
-  const CONTENT_KEY = "notesgpt_content";
+  const BASE_STORAGE_KEY = "notesgpt_history";
+  const BASE_CONTENT_KEY = "notesgpt_content";
   const MAX_ITEMS = 50;
 
-  // ── Get all history (local) ────────────────
+  // ── Get current user ID for scoping ────────
+  function _getUserId() {
+    if (typeof Auth !== "undefined" && Auth.isLoggedIn()) {
+      const user = Auth.getUser();
+      return user ? user.id : null;
+    }
+    return null;
+  }
+
+  function _storageKey() {
+    const uid = _getUserId();
+    return uid ? `${BASE_STORAGE_KEY}_${uid}` : null;
+  }
+
+  function _contentKey() {
+    const uid = _getUserId();
+    return uid ? `${BASE_CONTENT_KEY}_${uid}` : null;
+  }
+
+  // ── Get all history (local, user-scoped) ───
   function getAll() {
+    const key = _storageKey();
+    if (!key) return []; // Guest — no history
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      return JSON.parse(localStorage.getItem(key)) || [];
     } catch { return []; }
   }
 
   // ── Get stored content for a chapter ───────
   function getContent(classNum, subject, chapter) {
+    const sKey = _contentKey();
+    if (!sKey) return null;
     try {
-      const all = JSON.parse(localStorage.getItem(CONTENT_KEY)) || {};
+      const all = JSON.parse(localStorage.getItem(sKey)) || {};
       const key = `${classNum}_${subject}_${chapter}`;
       return all[key] || null;
     } catch { return null; }
@@ -25,18 +48,23 @@ const History = (() => {
 
   // ── Save generated content for a chapter ───
   function saveContent(classNum, subject, chapter, type, data) {
+    const sKey = _contentKey();
+    if (!sKey) return; // Guest — don't save
     try {
-      const all = JSON.parse(localStorage.getItem(CONTENT_KEY)) || {};
+      const all = JSON.parse(localStorage.getItem(sKey)) || {};
       const key = `${classNum}_${subject}_${chapter}`;
       if (!all[key]) all[key] = {};
       all[key][type] = data;
       all[key].lastUpdated = Date.now();
-      localStorage.setItem(CONTENT_KEY, JSON.stringify(all));
+      localStorage.setItem(sKey, JSON.stringify(all));
     } catch {}
   }
 
   // ── Save a generation ──────────────────────
   function save(entry) {
+    const key = _storageKey();
+    if (!key) return; // Guest — don't save
+
     const all = getAll();
 
     const existIdx = all.findIndex(
@@ -73,7 +101,7 @@ const History = (() => {
 
     if (all.length > MAX_ITEMS) all.length = MAX_ITEMS;
 
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); } catch {}
+    try { localStorage.setItem(key, JSON.stringify(all)); } catch {}
 
     // Cloud sync: save to server if logged in
     _cloudSave(entry);
@@ -81,15 +109,19 @@ const History = (() => {
 
   // ── Delete entry ───────────────────────────
   function remove(id) {
+    const key = _storageKey();
+    if (!key) return;
     const all = getAll().filter(h => h.id !== id);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); } catch {}
+    try { localStorage.setItem(key, JSON.stringify(all)); } catch {}
   }
 
   // ── Clear all ──────────────────────────────
   function clearAll() {
+    const sKey = _storageKey();
+    const cKey = _contentKey();
     try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(CONTENT_KEY);
+      if (sKey) localStorage.removeItem(sKey);
+      if (cKey) localStorage.removeItem(cKey);
     } catch {}
     // Cloud sync: clear on server
     _cloudClear();

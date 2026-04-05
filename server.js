@@ -753,32 +753,40 @@ Key Points: ${(q.key_points || []).join(", ")}
 Student's Answer: ${item.userAnswer}`;
     }).join("\n\n---\n\n");
 
-    const systemMsg = "You are a strict CBSE exam evaluator. Grade answers HONESTLY. If an answer is wrong, incomplete, or off-topic, give 0 or low marks. Do NOT be generous. Output ONLY a valid JSON array, no other text.";
-    const prompt = `Evaluate a CBSE Class ${classNum || "10"} student's test answers STRICTLY.
+    const systemMsg = "You are a strict CBSE exam evaluator. Compare the student's answer against the correct answer. Grade HONESTLY and ACCURATELY. If the answer is factually wrong, give 0 marks. Output ONLY a valid JSON array.";
+    const prompt = `You are evaluating a CBSE Class ${classNum || "10"} student's test. For EACH question below:
 
-Here are the questions, correct answers, and student's answers:
+1. Compare the student's answer CAREFULLY against the correct answer
+2. Check if the student's answer is FACTUALLY CORRECT (not just keyword matching)
+3. Check if ALL key points from the correct answer are covered
+4. Check for any WRONG statements in the student's answer (these should lose marks)
 
 ${qaText}
 
-STRICT RULES:
-- If student's answer is WRONG or completely off-topic: give 0 marks
-- If answer is partially correct: give proportional partial marks
-- If answer is correct but incomplete: deduct marks for missing key points
-- NEVER give full marks unless ALL key points are covered
-- Be FAIR but STRICT, like a real CBSE examiner
+STRICT GRADING RULES:
+- WRONG answer (factually incorrect, opposite meaning, or completely off-topic) → 0 marks
+- Partially correct (some right points, some missing) → proportional marks
+- Correct but incomplete (right idea, missing key details) → 50-70% marks
+- Fully correct with all key points → full marks
+- MCQ: ONLY full marks if the exact correct option is chosen, else 0
+- If student writes something FACTUALLY WRONG (not just incomplete), deduct extra marks
 
-Format strictly as a JSON array (no other text, no markdown, just the JSON):
+For EACH question, provide SPECIFIC feedback:
+- State clearly what was CORRECT in the student's answer
+- State clearly what was WRONG or MISSING
+- Do NOT give generic feedback like "Good answer" — be specific
 
+Format as JSON array (no other text):
 [
   {
     "marks_awarded": 0,
     "total_marks": 3,
-    "feedback": "Brief feedback on what was right/wrong",
-    "improvement_tip": "Specific tip to improve"
+    "feedback": "Your definition of photosynthesis was correct, but you missed mentioning chlorophyll and sunlight as requirements.",
+    "improvement_tip": "Remember: Photosynthesis requires sunlight, CO2, water, and chlorophyll."
   }
 ]
 
-Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
+Be honest and fair. Wrong = 0. Partial = partial. Correct = full.`;
 
     const raw = await callOpenRouter(apiKey, systemMsg, prompt, 3000);
 
