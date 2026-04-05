@@ -4631,14 +4631,11 @@ a, button, input, select, textarea {
 }
 
 .hero-mockup__header {
-  background: rgba(255, 255, 255, 0.08); /* White glass tint */
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: #ffffff; /* Solid White Header for contrast */
   padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* White line */
 }
 
 .mockup-dot {
@@ -4656,8 +4653,8 @@ a, button, input, select, textarea {
   margin-right: auto;
   font-size: 0.75rem;
   font-family: var(--font);
-  color: #a1a1aa;
-  font-weight: 500;
+  color: #000000;
+  font-weight: 700;
   transform: translateX(-15px); /* Offset dots */
 }
 
@@ -4715,18 +4712,17 @@ a, button, input, select, textarea {
 }
 
 .ms-skeleton {
-  background: rgba(255, 255, 255, 0.15);
+  background: #ffffff;
   border-radius: 4px;
   margin-bottom: 12px;
 }
 .ms-skeleton--title { height: 24px; width: 60%; margin-bottom: 24px; background: #ffffff; }
-.ms-skeleton--text { height: 12px; width: 100%; }
+.ms-skeleton--text { height: 12px; width: 100%; opacity: 0.9; }
 .ms-skeleton--text.block-1 { width: 90%; }
 .ms-skeleton--text.block-2 { width: 75%; margin-bottom: 24px; }
 
-/* ── Screen 1: Summary ── */
 .ms-highlight {
-  background: rgba(245, 158, 11, 0.1);
+  background: #ffffff;
   border-left: 4px solid #F59E0B;
   padding: 12px;
   border-radius: 0 8px 8px 0;
@@ -4735,7 +4731,7 @@ a, button, input, select, textarea {
   align-items: flex-start;
 }
 .ms-highlight-icon { font-size: 1.2rem; }
-.ms-highlight-text { font-size: 0.8rem; color: #FCD34D; font-weight: 500; line-height: 1.4; }
+.ms-highlight-text { font-size: 0.8rem; color: #000000; font-weight: 700; line-height: 1.4; }
 
 /* ── Screen 2: Flashcards ── */
 .ms-flashcard-scene {
@@ -4780,21 +4776,23 @@ a, button, input, select, textarea {
 .ms-options { display: flex; flex-direction: column; gap: 10px; }
 .ms-option {
   height: 40px;
-  border: 1px solid rgba(255,255,255,0.2);
+  background: #ffffff;
+  border: 1px solid #ffffff;
   border-radius: 8px;
   display: flex;
   align-items: center;
   padding: 0 16px;
   font-size: 0.8rem;
-  color: #ffffff;
+  color: #000000;
+  font-weight: 600;
 }
 .ms-option--correct {
   animation: option-correct 10s infinite;
   justify-content: space-between;
 }
 @keyframes option-correct {
-  0%, 53% { background: transparent; border-color: rgba(255,255,255,0.2); color: #ffffff; }
-  56%, 100% { background: rgba(34, 197, 94, 0.15); border-color: #22C55E; color: #4ade80; }
+  0%, 53% { background: #ffffff; border-color: #ffffff; color: #000000; }
+  56%, 100% { background: #DCFCE7; border-color: #22C55E; color: #166534; }
 }
 .ms-option-check {
   background: #22C55E;
@@ -4823,7 +4821,7 @@ a, button, input, select, textarea {
   position: relative;
 }
 .ms-result-circle svg { width: 160px; height: 160px; transform: rotate(-90deg); }
-.ms-circle-bg { fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 8; }
+.ms-circle-bg { fill: none; stroke: #ffffff; stroke-width: 8; opacity: 0.3; }
 .ms-circle-progress { 
   fill: none; 
   stroke: #22C55E; 
