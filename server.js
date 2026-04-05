@@ -5,6 +5,7 @@ const fs = require("fs");
 const { pipeline } = require("stream/promises");
 const { Readable } = require("stream");
 const { createClient } = require("@supabase/supabase-js");
+const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
 
 // ── Supabase Init ────────────────────────────────────────────
 let supabase = null;
@@ -1288,7 +1289,7 @@ Format strictly as a JSON object (no markdown, no extra text):
   }
 });
 
-// ── API route: generate audiobook (AI script + Bytez bark TTS) ─
+// ── API route: generate audiobook (AI script → Edge Neural TTS MP3) ─
 app.post("/api/generate-audio-script", async (req, res) => {
   try {
     const { classNum, subject, chapter, summaryText } = req.body;
@@ -1300,7 +1301,9 @@ app.post("/api/generate-audio-script", async (req, res) => {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
 
-    // ── Generate a clean, natural narration script via AI ──
+    // ── Step 1: Generate a clean narration script via AI ──
+    console.log(`🎧 Step 1: Generating narration script for "${chapter}"...`);
+
     const systemMsg = "You are a friendly, engaging CBSE teacher narrating a lesson. Output ONLY the spoken script — plain conversational sentences. No markdown, no bullet points, no headings, no special characters.";
     const prompt = `Convert the following study notes into a natural spoken narration script for a Class ${classNum || 10} ${subject || "Science"} student.
 
@@ -1320,6 +1323,7 @@ ${summaryText.slice(0, 4000)}
 
 Output ONLY the spoken script. Nothing else.`;
 
+    let script = "";
     const raw = await callOpenRouter(apiKey, systemMsg, prompt, 2000);
 
     // Clean any residual markdown
@@ -1330,22 +1334,72 @@ Output ONLY the spoken script. Nothing else.`;
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
-    if (!raw) {
-      // Fallback: clean up the notes text itself for TTS
-      const fallback = cleanScript(summaryText);
-      return res.json({ script: fallback, wordCount: fallback.split(/\s+/).length, type: "text-only" });
+    if (raw) {
+      script = cleanScript(raw);
+    } else {
+      script = cleanScript(summaryText).slice(0, 3000);
     }
 
-    const script = cleanScript(raw);
     const wordCount = script.split(/\s+/).length;
-    console.log(`🎧 Audiobook script ready: ~${wordCount} words`);
+    console.log(`🎧 Step 2: Script ready (~${wordCount} words). Generating MP3 via Edge Neural TTS...`);
 
-    return res.json({
-      script,
-      wordCount,
-      estimatedMinutes: Math.ceil(wordCount / 140),
-      type: "text-only",
-    });
+    // ── Step 2: Convert script to MP3 via Microsoft Edge Neural TTS ──
+    const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const audioDir = path.join(AUDIO_DIR, sessionId);
+    fs.mkdirSync(audioDir, { recursive: true });
+
+    try {
+      const tts = new MsEdgeTTS();
+      await tts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+      const result = await tts.toFile(audioDir, script);
+
+      if (!result || !result.audioFilePath) {
+        throw new Error("TTS returned no audio file");
+      }
+
+      // Move the generated file to a clean name
+      const finalName = `audiobook_${sessionId}.mp3`;
+      const finalPath = path.join(AUDIO_DIR, finalName);
+      fs.renameSync(result.audioFilePath, finalPath);
+
+      // Clean up the temp directory
+      try { fs.rmdirSync(audioDir); } catch {}
+
+      const stats = fs.statSync(finalPath);
+      const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
+      console.log(`✅ Audiobook MP3 generated: ${finalName} (${sizeMB}MB, ~${wordCount} words)`);
+
+      // Clean up old audiobook files (keep last 30)
+      try {
+        const allFiles = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("audiobook_") && f.endsWith(".mp3"));
+        if (allFiles.length > 30) {
+          const sorted = allFiles.sort();
+          const toDelete = sorted.slice(0, sorted.length - 30);
+          toDelete.forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
+          console.log(`🧹 Cleaned up ${toDelete.length} old audiobook files`);
+        }
+      } catch {}
+
+      return res.json({
+        script,
+        wordCount,
+        estimatedMinutes: Math.ceil(wordCount / 140),
+        type: "mp3",
+        audioUrl: `/audio/${finalName}`,
+        downloadUrl: `/audio/${finalName}`,
+      });
+    } catch (ttsErr) {
+      console.warn(`⚠️ Edge TTS failed: ${ttsErr.message} — falling back to text-only`);
+      // Clean up temp dir
+      try { fs.rmdirSync(audioDir, { recursive: true }); } catch {}
+
+      return res.json({
+        script,
+        wordCount,
+        estimatedMinutes: Math.ceil(wordCount / 140),
+        type: "text-only",
+      });
+    }
   } catch (err) {
     console.error("Audiobook error:", err);
     return res.status(500).json({ error: "An unexpected error occurred." });
