@@ -61,6 +61,22 @@ const Auth = (() => {
     }
   }
 
+  // ── Apple Sign-In ────────────────────────────
+  async function signInWithApple() {
+    if (!supabase) return _showError("Auth not configured");
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) _showError(error.message);
+    } catch (err) {
+      _showError(err.message);
+    }
+  }
+
   // ── Email/Password Sign-Up ───────────────────
   async function signUpWithEmail(email, password, displayName) {
     if (!supabase) return _showError("Auth not configured");
@@ -275,6 +291,10 @@ const Auth = (() => {
     const googleBtn = document.getElementById("auth-google-btn");
     if (googleBtn) googleBtn.addEventListener("click", signInWithGoogle);
 
+    // Apple sign-in
+    const appleBtn = document.getElementById("auth-apple-btn");
+    if (appleBtn) appleBtn.addEventListener("click", signInWithApple);
+
     // Email sign-in form
     const signinForm = document.getElementById("signin-form");
     if (signinForm) {
@@ -340,6 +360,7 @@ const Auth = (() => {
   return {
     init,
     signInWithGoogle,
+    signInWithApple,
     signUpWithEmail,
     signInWithEmail,
     resetPassword,

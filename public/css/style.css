@@ -4260,6 +4260,13 @@ a, button, input, select, textarea {
 }
 
 /* ── Google Button — Outlined Dark ── */
+/* ── Social Buttons Container ── */
+.auth-social-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .auth-google-btn {
   width: 100%;
   display: flex;
@@ -4283,6 +4290,32 @@ a, button, input, select, textarea {
 }
 .auth-google-btn:active { transform: scale(0.98); }
 .auth-google-btn svg { flex-shrink: 0; }
+
+/* ── Apple Sign-In Button ── */
+.auth-apple-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 13px 20px;
+  background: #fff;
+  color: #000;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.auth-apple-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.15);
+}
+.auth-apple-btn:active { transform: scale(0.98); }
+.auth-apple-btn svg { flex-shrink: 0; fill: #000; }
 
 /* ── Divider ── */
 .auth-divider {
