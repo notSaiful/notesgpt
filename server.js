@@ -59,50 +59,66 @@ app.get("/api/subjects/:classNum", (req, res) => {
   res.json({ subjects });
 });
 
-// ── Prompt builders (Exam-Cracking Focus) ────────────────────
+// ── Prompt builders (Content-First, Exam-Ready) ──────────────
 function buildNotesPrompt(classNum, subject, chapter, topic) {
   const isBoard = ["10", "12"].includes(classNum);
   const examType = isBoard ? "CBSE Board Examination" : `CBSE Class ${classNum} Annual Examination`;
   const topicLine = topic
-    ? `\nFOCUS SPECIFICALLY on the topic: "${topic}" within this chapter. Cover this topic in depth — explain it thoroughly with examples, formulas, and exam tips. Do not cover the entire chapter, only this specific topic.`
+    ? `\nFOCUS SPECIFICALLY on the topic: "${topic}" within this chapter. Cover this topic in depth — explain it thoroughly with examples, formulas, and diagrams. Do not cover the entire chapter, only this specific topic.`
     : "";
 
-  return `You are an expert CBSE exam preparation tutor for Class ${classNum} ${subject}. Your ONLY goal is to help the student score FULL MARKS in their ${examType}.
+  return `You are an expert CBSE teacher for Class ${classNum} ${subject}. Your goal is to TEACH the student the actual content of this chapter so they deeply understand every concept AND can score full marks.
 
-Generate study notes for the chapter: "${chapter}" in subject: "${subject}".${topicLine}
+Generate comprehensive study notes for the chapter: "${chapter}" in subject: "${subject}".${topicLine}
 
 CRITICAL INSTRUCTIONS:
-- Base your content STRICTLY on the NCERT textbook for Class ${classNum} ${subject}. Do NOT include anything outside the NCERT syllabus.
-- Prioritize topics and concepts that have appeared REPEATEDLY in previous year CBSE question papers (PYQs) for Class ${classNum}.
-- For Class ${isBoard ? classNum : classNum}, focus on the types of questions that examiners actually ask — definitions, derivations, diagram-based, numerical, and application-based.
-- Highlight which points carry marks in board/annual exams and how to write answers to get full marks.
-- Include "Examiner's Favourite" tags next to points that appear frequently in PYQs.
+- Base your content STRICTLY on the NCERT textbook for Class ${classNum} ${subject}.
+- ACTUALLY EXPLAIN every concept in clear, simple language. Do not just list topics — teach them.
+- Include real examples, solved problems, and illustrations wherever applicable.
+- Give the EXACT NCERT definitions word-for-word where definitions matter (Science, Social Science).
+- For Maths/Physics/Chemistry: include step-by-step solved examples for every important formula.
+- For Biology/Social Science: include detailed explanations with cause-effect, processes, and important diagrams to draw.
+- Mark frequently examined points with ⭐ so the student knows what to prioritize.
 
 Format the output strictly as:
 
 ## 1. ${topic ? `Topic Overview: ${topic}` : "Chapter Overview"}
-(3-5 lines, simple explanation as per NCERT)
+(A clear 5-8 line explanation of what this chapter/topic is about. Explain the core idea in simple language a Class ${classNum} student can immediately understand.)
 
-## 2. Key Concepts (Most Tested in Exams)
-(bullet points — tag each with ⭐ if it appeared in 3+ previous year papers)
+## 2. Key Concepts Explained
+(For EACH important concept in this chapter:)
+- **Concept Name**: Clear 2-4 line explanation in simple words
+- Include real-world examples or analogies to make it memorable
+- If there is a diagram, describe what to draw and label
+- Mark with ⭐ if frequently asked in exams
 
-## 3. Important Formulas / Definitions
-(if applicable — include EXACT NCERT definitions that examiners expect)
+## 3. Important Definitions & Formulas
+(List ALL important definitions and formulas from NCERT for this chapter)
+- Write each definition EXACTLY as it appears in NCERT (examiners check for exact wording)
+- For each formula: state it, explain each variable, and show one quick solved example
+- For non-science subjects: list key terms with their precise meanings
 
-## 4. Previous Year Exam Patterns
-- List the types of questions asked from this chapter in past ${examType}s
-- Mention which topics get 1-mark, 2-mark, 3-mark, and 5-mark questions
-- Note any "guaranteed" questions that appear almost every year
+## 4. Solved Examples & Numericals
+(Include 3-5 worked-out problems or detailed answers that demonstrate how to apply the concepts)
+- Show complete step-by-step solutions
+- Cover different types: easy, medium, and one tricky problem
+- For non-numerical subjects: write 2-3 model answers for likely exam questions (short answer + long answer format)
 
-## 5. How to Write Answers for Full Marks
-- Step-by-step answer writing tips specific to this chapter
-- What key points/keywords the examiner looks for
-- Common mistakes students make that cost them marks
+## 5. Diagrams & Visual Aids
+(List the important diagrams a student must know for this chapter)
+- Describe each diagram: what to draw, what to label, key points the examiner checks
+- For Maths: include graphs or geometric constructions if relevant
+- For History/Geography: mention important maps or timelines
 
-## 6. Quick Revision Summary (Last-Minute Exam Prep)
-(10-15 one-liner points — the absolute essentials to revise before walking into the exam hall)
+## 6. Common Mistakes to Avoid
+(5-8 specific mistakes students make in this chapter that cost them marks)
+- What the mistake is → What the correct approach is
+- Focus on conceptual errors, not just presentation tips
 
-Ensure EVERY point directly helps the student score marks in their ${examType}. Remove all filler content. Language must be simple, clear, and Class ${classNum} appropriate.`;
+## 7. Quick Revision Summary
+(15-20 crisp one-liner points covering the absolute essentials of this chapter — perfect for last-minute revision before the exam)
+
+Language must be simple, clear, and appropriate for a Class ${classNum} student. TEACH the content — do not just list exam tips.`;
 }
 
 function buildFlashcardPrompt(classNum, subject, chapter) {
@@ -505,9 +521,9 @@ app.post("/api/generate-notes", async (req, res) => {
 
     if (topic) console.log(`📌 Topic focus: "${topic}" within ${chapter}`);
 
-    const systemMsg = "You are an expert CBSE teacher. Generate well-structured, exam-focused study notes appropriate for the student's class level. Use markdown formatting with headings (##), bullet points, and bold for emphasis.";
+    const systemMsg = "You are an expert CBSE teacher who TEACHES content thoroughly. Explain every concept clearly with examples, solved problems, and diagrams. Use markdown formatting with headings (##), bullet points, bold for emphasis, and proper mathematical notation. Prioritize actual explanations over exam-writing tips.";
     const prompt = buildNotesPrompt(classNum, subject, chapter.trim(), topic || "");
-    const notes = await callOpenRouter(apiKey, systemMsg, prompt);
+    const notes = await callOpenRouter(apiKey, systemMsg, prompt, 4000);
 
     if (!notes) {
       return res.status(502).json({ error: "All AI models are temporarily busy. Please try again in a minute." });
