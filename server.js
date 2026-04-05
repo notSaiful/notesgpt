@@ -1560,7 +1560,7 @@ Format as JSON array of strings:
     console.log(`📝 Generated ${scenes.length} scene descriptions`);
 
     // ── Step 2: Generate video clips in parallel via Bytez ──
-    console.log(`🎬 Step 2: Generating ${scenes.length} video clips via Bytez...`);
+    console.log(`🎬 Step 2: Generating ${scenes.length} video clips via Bytez (Wan-2.1)...`);
 
     const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     
@@ -1568,17 +1568,18 @@ Format as JSON array of strings:
       try {
         console.log(`  🎥 Clip ${idx + 1}: "${scene.slice(0, 50)}..."`);
         
-        // Try models in order: zeroscope (faster) → ali-vilab (more detail)
+        // Try state-of-the-art Wan-2.1 first, zeroscope as backup
         const VIDEO_MODELS = [
+          "Wan-AI/Wan2.1-T2V-1.3B",
           "cerspense/zeroscope_v2_576w",
-          "ali-vilab/text-to-video-ms-1.7b",
         ];
 
         let data = null;
         for (const model of VIDEO_MODELS) {
           try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 300000); // 5 min
+            // Wan-2.1 is heavy, give it a massive 8 minute timeout
+            const timeout = setTimeout(() => controller.abort(), 480000);
 
             const response = await fetch(`https://api.bytez.com/models/v2/${model}`, {
               method: "POST",
