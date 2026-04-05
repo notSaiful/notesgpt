@@ -27,7 +27,19 @@ const ExamArena = {
       this.startArena();
     });
     document.getElementById("arena-continue-btn")?.addEventListener("click", () => {
-      window.location.reload(); // Simple reset back to dashboard
+      if (typeof ChapterComplete !== "undefined") {
+        ChapterComplete.show({
+          chapter: window.currentChapter,
+          subject: window.currentSubject,
+          classNum: window.currentClassNum,
+          arenaScore: this.score,
+          arenaAccuracy: Math.round((this.correctCount / this.questions.length) * 100),
+          arenaSpeed: document.getElementById("arena-final-speed")?.textContent || "—",
+          arenaStreak: this.maxStreak,
+        });
+      } else {
+        window.location.reload();
+      }
     });
   },
 

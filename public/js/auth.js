@@ -188,10 +188,19 @@ const Auth = (() => {
     const profileAvatar = document.getElementById("user-avatar");
     const profileName = document.getElementById("user-display-name");
     const guestBanner = document.getElementById("guest-banner");
+    const dashWelcome = document.getElementById("dash-welcome");
+    const dashUsername = document.getElementById("dash-username");
 
     if (user) {
       // Logged in
       if (authBtn) authBtn.style.display = "none";
+      if (guestBanner) guestBanner.style.display = "none";
+
+      const name = user.user_metadata?.full_name ||
+                   user.user_metadata?.name ||
+                   user.email?.split("@")[0] ||
+                   "Student";
+
       if (profileBadge) {
         profileBadge.style.display = "flex";
         const avatarUrl = user.user_metadata?.avatar_url || "";
@@ -200,19 +209,19 @@ const Auth = (() => {
           profileAvatar.style.display = avatarUrl ? "block" : "none";
         }
         if (profileName) {
-          profileName.textContent =
-            user.user_metadata?.full_name ||
-            user.user_metadata?.name ||
-            user.email?.split("@")[0] ||
-            "Student";
+          profileName.textContent = name;
         }
       }
-      if (guestBanner) guestBanner.style.display = "none";
+
+      if (dashWelcome) dashWelcome.classList.remove("hidden");
+      if (dashUsername) dashUsername.textContent = name;
+
     } else {
       // Logged out / guest
       if (authBtn) authBtn.style.display = "inline-flex";
       if (profileBadge) profileBadge.style.display = "none";
       if (guestBanner && isConfigured) guestBanner.style.display = "flex";
+      if (dashWelcome) dashWelcome.classList.add("hidden");
     }
   }
 
@@ -296,7 +305,7 @@ const Auth = (() => {
     if (appleBtn) appleBtn.addEventListener("click", signInWithApple);
 
     // Email sign-in form
-    const signinForm = document.getElementById("signin-form");
+    const signinForm = document.getElementById("auth-form-signin");
     if (signinForm) {
       signinForm.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -307,7 +316,7 @@ const Auth = (() => {
     }
 
     // Email sign-up form
-    const signupForm = document.getElementById("signup-form");
+    const signupForm = document.getElementById("auth-form-signup");
     if (signupForm) {
       signupForm.addEventListener("submit", (e) => {
         e.preventDefault();

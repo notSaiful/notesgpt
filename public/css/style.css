@@ -5570,3 +5570,288 @@ a, button, input, select, textarea {
   0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
   50% { transform: translateX(-50%) translateY(-20px) scale(1.02); }
 }
+
+/* ══════════════════════════════════════════════
+   CHAPTER COMPLETION SCREEN
+   ══════════════════════════════════════════════ */
+
+.chapter-complete {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  animation: ccFadeIn 0.6s ease-out;
+}
+
+@keyframes ccFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cc-container {
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+}
+
+/* ── Check Ring Animation ── */
+.cc-header {
+  margin-bottom: 36px;
+}
+
+.cc-check-ring {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px;
+  position: relative;
+}
+
+.cc-check-svg {
+  width: 72px;
+  height: 72px;
+}
+
+.cc-check-circle {
+  stroke: #22c55e;
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  stroke-linecap: round;
+  transition: none;
+}
+
+.cc-check-mark {
+  stroke: #22c55e;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  transition: none;
+}
+
+.cc-check-ring--animate .cc-check-circle {
+  animation: ccCircleDraw 0.6s ease-out 0.1s forwards;
+}
+
+.cc-check-ring--animate .cc-check-mark {
+  animation: ccCheckDraw 0.4s ease-out 0.5s forwards;
+}
+
+@keyframes ccCircleDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes ccCheckDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+.cc-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.cc-subtitle {
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ── Performance Stats Grid ── */
+.cc-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.cc-stat {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.3s ease;
+}
+
+.cc-stat:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.cc-stat__icon {
+  font-size: 1.4rem;
+}
+
+.cc-stat__value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.cc-stat__label {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+/* ── Insight Box ── */
+.cc-insight {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cc-insight__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.cc-insight__row--strong {
+  background: rgba(34, 197, 94, 0.08);
+  border-left: 3px solid rgba(34, 197, 94, 0.5);
+}
+
+.cc-insight__row--weak {
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid rgba(245, 158, 11, 0.5);
+}
+
+.cc-insight__icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.cc-insight__text {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.45;
+}
+
+/* ── Confidence Message ── */
+.cc-confidence {
+  margin-bottom: 28px;
+  padding: 0 12px;
+}
+
+.cc-confidence__text {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ── Progress Bar ── */
+.cc-progress-reward {
+  margin-bottom: 36px;
+  padding: 0 4px;
+}
+
+.cc-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cc-progress-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+.cc-progress-badge {
+  font-size: 0.72rem;
+  color: #22c55e;
+  font-weight: 600;
+  background: rgba(34, 197, 94, 0.1);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.cc-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cc-progress-fill {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 6px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Action Buttons ── */
+.cc-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 340px;
+  margin: 0 auto;
+}
+
+.cc-btn-primary {
+  padding: 15px 28px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  border-radius: 14px !important;
+  letter-spacing: -0.01em;
+}
+
+.cc-btn-secondary {
+  padding: 12px 24px !important;
+  font-size: 0.85rem !important;
+  border-radius: 12px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.cc-btn-secondary:hover {
+  color: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* ── Mobile ── */
+@media (max-width: 520px) {
+  .cc-title { font-size: 1.5rem; }
+  .cc-stats-grid { gap: 8px; }
+  .cc-stat { padding: 16px 8px; }
+  .cc-stat__value { font-size: 1.2rem; }
+  .cc-insight__row { padding: 12px 14px; }
+  .chapter-complete { padding: 28px 16px; }
+}
+
+/* ── Dashboard Welcome Message ── */
+.dash-welcome {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 24px;
+  letter-spacing: -0.02em;
+  opacity: 0;
+  transform: translateY(-12px);
+}

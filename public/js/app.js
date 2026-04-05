@@ -60,6 +60,7 @@ const DOM = {
   arenaSection: document.getElementById("arena-section"),
   arenaResults: document.getElementById("arena-results"),
   reviewSection: document.getElementById("review-section"),
+  chapterComplete: document.getElementById("chapter-complete"),
   histSectionWrap: document.getElementById("hist-section-wrap"),
 };
 
@@ -92,6 +93,7 @@ const ALL_SECTIONS = [
   DOM.arenaSection,
   DOM.arenaResults,
   DOM.reviewSection,
+  DOM.chapterComplete,
 ];
 
 // ── Global view manager ──────────────────────
@@ -131,8 +133,8 @@ function updateStepper(view) {
   else if (["correction", "retry-loading", "retry", "retry-complete", "unlock"].includes(view)) activeIndex = 2;
   // Revise phase: mindmap, audiobook
   else if (["mindmap-loading", "mindmap", "audiobook"].includes(view)) activeIndex = 3;
-  // Master phase: aivideo, song
-  else if (["aivideo", "song"].includes(view)) activeIndex = 4;
+  // Master phase: aivideo, song, chapter-complete
+  else if (["aivideo", "song", "chapter-complete"].includes(view)) activeIndex = 4;
 
   steps.forEach((stepId, index) => {
     const el = document.getElementById(stepId);
@@ -174,11 +176,20 @@ function setGlobalView(view) {
     aivideo: DOM.aivideoSection,
     song: DOM.songSection,
     review: DOM.reviewSection,
+    "chapter-complete": DOM.chapterComplete,
   };
 
   ALL_SECTIONS.forEach((s) => { if (s) s.classList.add("hidden"); });
   const target = viewMap[view];
   if (target) target.classList.remove("hidden");
+
+  if (DOM.histSectionWrap) {
+    if (view === "form" || view === "review") {
+      // Visibility is managed by renderDashboard / review logic
+    } else {
+      DOM.histSectionWrap.style.display = "none";
+    }
+  }
 
   // Update Stepper UI
   updateStepper(view);
@@ -456,6 +467,21 @@ document.addEventListener("DOMContentLoaded", () => {
       appView.classList.remove("hidden");
       appView.style.opacity = "0";
       appView.style.animation = "fadeUp 0.6s ease-out forwards";
+
+      // Wait for app view to be fully visible, then animate welcome
+      setTimeout(() => {
+        const welcome = document.getElementById("dash-welcome");
+        if (welcome && !welcome.classList.contains("hidden")) {
+          welcome.style.opacity = "0";
+          welcome.style.transform = "translateY(-12px)";
+          // Force reflow
+          void welcome.offsetWidth;
+          welcome.style.transition = "opacity 0.5s ease-out, transform 0.5s ease-out";
+          welcome.style.opacity = "1";
+          welcome.style.transform = "translateY(0)";
+        }
+      }, 650);
+
       window.scrollTo(0, 0);
     }, 400);
   };
@@ -537,6 +563,22 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         resetToForm();
       }
+    });
+  }
+
+  // ── Chapter Completion Screen ──────────────────
+  const ccNextBtn = document.getElementById("cc-next-chapter-btn");
+  if (ccNextBtn) {
+    ccNextBtn.addEventListener("click", () => {
+      resetToForm();
+    });
+  }
+
+  const ccReviseBtn = document.getElementById("cc-revise-btn");
+  if (ccReviseBtn) {
+    ccReviseBtn.addEventListener("click", () => {
+      setGlobalView("output");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
 

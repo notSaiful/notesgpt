@@ -329,6 +329,9 @@
       <!-- ═══ Main Content Area ═══ -->
       <div class="app-main">
 
+        <!-- ═══ Welcome Message ═══ -->
+        <h1 class="dash-welcome hidden" id="dash-welcome">Welcome, <span id="dash-username">Student</span> 👋</h1>
+
     <!-- ═══ Step 0: Input ═══ -->
     <section class="card card--input" id="input-section">
       <h2 class="card__title">Generate Your Notes</h2>
@@ -800,7 +803,83 @@
 
       <div class="arena-results__actions">
         <button class="btn btn--accent btn--lg" id="arena-retry-btn">⚔️ Play Again</button>
-        <button class="btn btn--primary" id="arena-continue-btn">Continue to Dashboard</button>
+        <button class="btn btn--primary" id="arena-continue-btn">Complete Chapter →</button>
+      </div>
+    </section>
+
+    <!-- ═══ CHAPTER COMPLETION SCREEN ═══ -->
+    <section class="chapter-complete hidden" id="chapter-complete">
+      <div class="cc-container">
+
+        <!-- 1. Primary Emotion Header -->
+        <div class="cc-header">
+          <div class="cc-check-ring" id="cc-check-ring">
+            <svg class="cc-check-svg" viewBox="0 0 52 52">
+              <circle class="cc-check-circle" cx="26" cy="26" r="24" fill="none" stroke-width="2"/>
+              <path class="cc-check-mark" fill="none" stroke-width="3" d="M14 27l7 7 16-16"/>
+            </svg>
+          </div>
+          <h2 class="cc-title">Chapter Completed</h2>
+          <p class="cc-subtitle" id="cc-chapter-name">You've successfully completed this chapter.</p>
+        </div>
+
+        <!-- 2. Performance Summary -->
+        <div class="cc-stats-grid">
+          <div class="cc-stat" id="cc-stat-score">
+            <span class="cc-stat__icon">📊</span>
+            <span class="cc-stat__value" id="cc-score-val">—</span>
+            <span class="cc-stat__label">Test Score</span>
+          </div>
+          <div class="cc-stat" id="cc-stat-accuracy">
+            <span class="cc-stat__icon">🎯</span>
+            <span class="cc-stat__value" id="cc-accuracy-val">—</span>
+            <span class="cc-stat__label">Accuracy</span>
+          </div>
+          <div class="cc-stat" id="cc-stat-speed">
+            <span class="cc-stat__icon">⚡</span>
+            <span class="cc-stat__value" id="cc-speed-val">—</span>
+            <span class="cc-stat__label">Speed</span>
+          </div>
+        </div>
+
+        <!-- 3. AI Insight -->
+        <div class="cc-insight">
+          <div class="cc-insight__row cc-insight__row--strong" id="cc-insight-strong">
+            <span class="cc-insight__icon">🧠</span>
+            <span class="cc-insight__text" id="cc-strong-text">Analyzing your performance…</span>
+          </div>
+          <div class="cc-insight__row cc-insight__row--weak" id="cc-insight-weak" style="display:none;">
+            <span class="cc-insight__icon">⚠️</span>
+            <span class="cc-insight__text" id="cc-weak-text"></span>
+          </div>
+        </div>
+
+        <!-- 4. Confidence Message -->
+        <div class="cc-confidence">
+          <p class="cc-confidence__text" id="cc-confidence-msg">You're now better prepared for this chapter.</p>
+        </div>
+
+        <!-- 5. Progress Bar Reward -->
+        <div class="cc-progress-reward">
+          <div class="cc-progress-row">
+            <span class="cc-progress-label">Chapter Progress</span>
+            <span class="cc-progress-badge" id="cc-progress-badge">+1 Completed</span>
+          </div>
+          <div class="cc-progress-bar">
+            <div class="cc-progress-fill" id="cc-progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- 6. Action Buttons -->
+        <div class="cc-actions">
+          <button class="btn btn--primary btn--lg cc-btn-primary" id="cc-next-chapter-btn">
+            Continue to Next Chapter →
+          </button>
+          <button class="btn btn--outline cc-btn-secondary" id="cc-revise-btn">
+            🔄 Revise Again
+          </button>
+        </div>
+
       </div>
     </section>
 
@@ -1007,6 +1086,7 @@
   <script src="/js/aivideo.js"></script>
   <script src="/js/doubt.js"></script>
   <script src="/js/legendary.js"></script>
+  <script src="/js/chapter-complete.js"></script>
   <script src="/js/arena.js"></script>
 </body>
 </html>
