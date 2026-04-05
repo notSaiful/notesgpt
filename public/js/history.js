@@ -352,42 +352,34 @@ const History = (() => {
     }
   }
 
-  // ── Revise (launch revision tools) ─────────
+  // ── Revise (re-read notes or launch revision tools) ─
   function revise(id) {
     const all = getAll();
     const entry = all.find(h => h.id === id);
     if (!entry) return;
 
     window.currentClassNum = entry.classNum;
-    window.currentSubject = entry.subject;
-    window.currentChapter = entry.chapter;
+    window.currentSubject  = entry.subject;
+    window.currentChapter  = entry.chapter;
 
-    // Open YouTube video for this chapter
-    if (typeof VideoHelp !== "undefined") {
-      VideoHelp.show("");
-    }
+    // Check if we have stored summary content to show
+    const content = getContent(entry.classNum, entry.subject, entry.chapter);
 
-    // Show audio section
-    if (typeof AudioPlayer !== "undefined") {
-      AudioPlayer.show();
-    }
+    if (content && content.summary) {
+      // Restore the notes into the output section
+      const notesEl = document.getElementById("notes-content");
+      const outputTitle = document.getElementById("output-title");
+      const outputBadge = document.getElementById("output-badge");
 
-    // Show music section
-    if (typeof MusicPlayer !== "undefined") {
-      MusicPlayer.show();
-    }
+      if (notesEl) notesEl.innerHTML = content.summary;
+      if (outputTitle) outputTitle.textContent = entry.chapter;
+      if (outputBadge) outputBadge.textContent = `Class ${entry.classNum} · ${entry.subject}`;
 
-    // Navigate to test-results view which shows revision tools
-    if (typeof setGlobalView === "function") {
-      setGlobalView("test-results");
-    }
-
-    // Scroll to audio section
-    const audioSection = document.getElementById("audio-section");
-    if (audioSection) {
-      setTimeout(() => {
-        audioSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 300);
+      if (typeof setGlobalView === "function") setGlobalView("output");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      // No stored content — regenerate the notes
+      regenerate(id);
     }
   }
 

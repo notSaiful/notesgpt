@@ -417,8 +417,22 @@ DOM.form.addEventListener("submit", async (e) => {
 if (DOM.newNotesBtn) DOM.newNotesBtn.addEventListener("click", resetToForm);
 
 if (DOM.dashNewBtn) DOM.dashNewBtn.addEventListener("click", () => {
-  DOM.chapter.focus();
-  DOM.chapter.scrollIntoView({ behavior: "smooth" });
+  setGlobalView("form");
+  if (DOM.histSectionWrap) DOM.histSectionWrap.style.display = "none";
+  // Clear previous selections for a fresh start
+  DOM.classSelect.value = "";
+  DOM.subject.innerHTML = '<option value="" disabled selected>Select class first</option>';
+  DOM.subject.disabled = true;
+  DOM.chapter.innerHTML = '<option value="" disabled selected>Select subject first</option>';
+  DOM.chapter.disabled = true;
+  currentClassNum = "";
+  currentSubject = "";
+  currentChapter = "";
+  window.currentClassNum = "";
+  window.currentSubject = "";
+  window.currentChapter = "";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  setTimeout(() => DOM.classSelect.focus(), 300);
 });
 
 // Summary → Flashcards
@@ -587,7 +601,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const ccReviseBtn = document.getElementById("cc-revise-btn");
   if (ccReviseBtn) {
     ccReviseBtn.addEventListener("click", () => {
-      setGlobalView("output");
+      // Check if notes content still exists; if so, show it
+      const notesEl = document.getElementById("notes-content");
+      if (notesEl && notesEl.innerHTML.trim()) {
+        setGlobalView("output");
+      } else {
+        // Notes were cleared — go back to form to regenerate
+        setGlobalView("form");
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }
