@@ -62,6 +62,7 @@ app.use(express.static(path.join(__dirname, "public"), {
 
 // ── Free models to try (best quality + speed first) ─────────
 const FREE_MODELS = [
+  "z-ai/glm-4.5-air:free",
   "google/gemini-2.0-flash-001:free",
   "google/gemma-3-27b-it:free",
   "qwen/qwen3.6-plus-preview:free",
