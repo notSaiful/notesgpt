@@ -357,93 +357,122 @@ Question types must be: "concept_recognition", "method_selection", "quick_mcq", 
 Make it high-stakes and elite.`;
 }
 
+// ── Daily limit cache — avoids wasting time retrying OpenRouter ──
+let _dailyLimitHit = false;
+let _dailyLimitResetAt = 0;
+
+function isDailyLimitActive() {
+  if (!_dailyLimitHit) return false;
+  if (Date.now() > _dailyLimitResetAt) {
+    _dailyLimitHit = false; // expired, try OpenRouter again
+    return false;
+  }
+  return true;
+}
+
+function markDailyLimitHit() {
+  _dailyLimitHit = true;
+  // Reset after 1 hour (or at next midnight UTC, whichever is sooner)
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setUTCHours(24, 0, 0, 0);
+  const msToMidnight = midnight.getTime() - now.getTime();
+  _dailyLimitResetAt = Date.now() + Math.min(msToMidnight, 3600000);
+  console.log(`⛔ Daily free limit cached — skipping OpenRouter for ${Math.round(Math.min(msToMidnight, 3600000) / 60000)}min`);
+}
+
+// ── Bytez models — same families as OpenRouter list ──
+const BYTEZ_MODELS = [
+  "Qwen/Qwen2.5-3B-Instruct",       // Qwen family (matches Qwen 3.6)
+  "THUDM/glm-4-9b-chat",            // GLM family (matches GLM 4.5 Air)
+  "Qwen/Qwen2-1.5B-Instruct",       // Qwen fallback (smaller)
+  "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+  "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+];
+
 async function callOpenRouter(apiKey, systemMsg, prompt, maxTokens = 2048) {
 
-  // Fallback to Primary Protocol: OpenRouter Free Models
-  console.log(`🔌 Initializing OpenRouter Pipeline`);
-  for (const model of FREE_MODELS) {
-    try {
-      console.log(`⏳ Trying model: ${model}`);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
+  // ── FAST PATH: if daily limit already cached, skip straight to Bytez ──
+  if (isDailyLimitActive()) {
+    console.log(`⚡ Daily limit cached — going directly to Bytez`);
+  } else {
+    // ── Try OpenRouter free models ──
+    console.log(`🔌 Initializing OpenRouter Pipeline`);
+    for (const model of FREE_MODELS) {
+      try {
+        console.log(`⏳ Trying model: ${model}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
 
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "http://localhost:3000",
-          "X-Title": "NotesGPT",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: systemMsg },
-            { role: "user", content: prompt },
-          ],
-          max_tokens: maxTokens,
-          temperature: 0.5,
-        }),
-      });
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            "HTTP-Referer": "https://notesgpt.online",
+            "X-Title": "NotesGPT",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemMsg },
+              { role: "user", content: prompt },
+            ],
+            max_tokens: maxTokens,
+            temperature: 0.5,
+          }),
+        });
 
-      clearTimeout(timeout);
+        clearTimeout(timeout);
 
-      if (response.ok) {
-        let data = await response.json();
-        let content = data.choices?.[0]?.message?.content;
-        
-        // Remove markdown wrappers often injected by Gemini/Flash
-        if (content && content.startsWith("\`\`\`json")) {
-           content = content.replace(/^\`\`\`json/i, "").replace(/\`\`\`$/i, "").trim();
-        }
+        if (response.ok) {
+          let data = await response.json();
+          let content = data.choices?.[0]?.message?.content;
+          
+          // Remove markdown wrappers
+          if (content && content.startsWith("\`\`\`json")) {
+             content = content.replace(/^\`\`\`json/i, "").replace(/\`\`\`$/i, "").trim();
+          }
 
-        if (content) {
-          console.log(`✅ Success with ${model}`);
-          return content;
+          if (content) {
+            console.log(`✅ Success with ${model}`);
+            return content;
+          }
+          console.warn(`⚠️  ${model} returned empty content`);
+        } else {
+          const errBody = await response.text();
+          console.warn(`⚠️  ${model} failed (${response.status}): ${errBody.slice(0, 150)}`);
+          
+          // Daily free limit hit — cache it and skip to Bytez immediately
+          if (response.status === 429 && errBody.includes("free-models-per-day")) {
+            markDailyLimitHit();
+            break;
+          }
+          // Per-minute rate limit — wait briefly then try next model
+          if (response.status === 429 && errBody.includes("per-min")) {
+            console.log(`⏸️  Per-minute rate limit — waiting 5s...`);
+            await new Promise(r => setTimeout(r, 5000));
+          }
         }
-        console.warn(`⚠️  ${model} returned empty content`);
-      } else {
-        const errBody = await response.text();
-        console.warn(`⚠️  ${model} failed (${response.status}): ${errBody.slice(0, 150)}`);
-        
-        // Daily free limit hit — all free models share the same quota, skip to Bytez
-        if (response.status === 429 && errBody.includes("free-models-per-day")) {
-          console.log(`⛔ Daily free model limit reached — skipping to Bytez fallback`);
-          break;
-        }
-        // Per-minute rate limit — wait briefly then try next model
-        if (response.status === 429 && errBody.includes("per-min")) {
-          console.log(`⏸️  Per-minute rate limit hit — waiting 5s before next model...`);
-          await new Promise(r => setTimeout(r, 5000));
-        }
+      } catch (err) {
+        console.warn(`⚠️  ${model} threw exception: ${err.message}`);
       }
-    } catch (err) {
-      console.warn(`⚠️  ${model} threw exception: ${err.message}`);
     }
   }
 
-  // ── FALLBACK: Bytez API (when ALL OpenRouter models are exhausted) ──
+  // ── FALLBACK: Bytez API ──
   const bytezKey = process.env.BYTEZ_API_KEY;
   if (bytezKey) {
-    // Bytez free tier: "sm" models only, 1 request at a time
-    const BYTEZ_MODELS = [
-      "Qwen/Qwen2-1.5B-Instruct",
-      "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
-    ];
+    console.log(`🔌 Switching to Bytez API (${BYTEZ_MODELS.length} models)`);
 
-    console.log(`🔌 OpenRouter exhausted — falling back to Bytez API`);
-
-    // Try each model with generous timeout for cold starts
     for (const bModel of BYTEZ_MODELS) {
-      // Wait between attempts to respect 1-req-at-a-time limit
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 1500)); // respect 1-req-at-a-time
 
       try {
         console.log(`⏳ Trying Bytez: ${bModel}`);
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 120000); // 120s for cold start
+        const timeout = setTimeout(() => controller.abort(), 120000);
 
         const response = await fetch(`https://api.bytez.com/models/v2/${bModel}`, {
           method: "POST",
@@ -473,7 +502,6 @@ async function callOpenRouter(apiKey, systemMsg, prompt, maxTokens = 2048) {
         } else {
           const errBody = await response.text();
           console.warn(`⚠️  Bytez ${bModel} failed (${response.status}): ${errBody.slice(0, 150)}`);
-          // If rate limited, wait longer before trying next model
           if (response.status === 429) {
             console.log(`⏸️  Bytez rate limited — waiting 6s...`);
             await new Promise(r => setTimeout(r, 6000));
@@ -487,6 +515,7 @@ async function callOpenRouter(apiKey, systemMsg, prompt, maxTokens = 2048) {
 
   return null;
 }
+
 
 // ── Extract JSON array from LLM response ─────────────────────
 function extractJsonArray(raw) {
