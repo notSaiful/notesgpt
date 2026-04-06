@@ -1737,11 +1737,13 @@ Output song lyrics only. Nothing else.`;
   }
 });
 
-// ── API route: generate AI visual slideshow (Pollinations.ai — FREE) ────
-// Generates educational images + narration for each scene
-// Uses Pollinations.ai (Flux model) — completely free, no API key needed
+// ── API route: generate AI Visual Lesson (Pollinations + Neural TTS) ────
+// Generates 6-8 educational images + per-slide Neural TTS voiceover
+// Frontend plays as a seamless auto-playing video — no manual navigation
 const IMAGES_DIR = path.join(__dirname, "public", "images", "slides");
+const SLIDE_AUDIO_DIR = path.join(__dirname, "public", "audio", "slides");
 if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
+if (!fs.existsSync(SLIDE_AUDIO_DIR)) fs.mkdirSync(SLIDE_AUDIO_DIR, { recursive: true });
 
 app.post("/api/generate-video", async (req, res) => {
   try {
@@ -1756,132 +1758,163 @@ app.post("/api/generate-video", async (req, res) => {
       return res.status(500).json({ error: "OpenRouter API key not configured.", fallback: "youtube" });
     }
 
-    // ── Step 1: Generate scene descriptions + narration via AI ──
-    console.log(`🎬 Step 1: Generating visual scenes for "${chapter}"...`);
+    // ── Step 1: Generate 6-8 scene descriptions + detailed narration ──
+    console.log(`🎬 Step 1: Generating visual lesson scenes for "${chapter}"...`);
 
-    const sceneSystemMsg = `You are an educational visual content director. Generate scene descriptions with narration for an illustrated visual lesson.
-Output ONLY a valid JSON array, no other text. Each element must have "image_prompt" and "narration" fields.`;
+    const sceneSystemMsg = `You are an expert CBSE teacher creating a video lesson. Generate scene descriptions with spoken narration for an illustrated educational video.
+Output ONLY a valid JSON array, no other text. Each element must have "image_prompt", "narration", and "title" fields.`;
 
-    const scenePrompt = `Create 4 illustrated scenes for a visual lesson about CBSE Class ${classNum || 10} ${subject || ""} chapter: "${chapter}".
+    const scenePrompt = `Create exactly 7 illustrated scenes for a complete visual lesson about CBSE Class ${classNum || 10} ${subject || ""} chapter: "${chapter}".
 
-Each scene should visually explain a KEY CONCEPT from the chapter.
+Structure the 7 scenes like a real video lesson:
+Scene 1: INTRODUCTION — Hook the student, state what they'll learn
+Scene 2-3: CORE CONCEPTS — Explain the fundamental ideas with visuals
+Scene 4-5: DETAILED EXPLANATION — Dive deeper with diagrams, processes, formulas
+Scene 6: EXAM FOCUS — Important questions, common mistakes, marking scheme tips
+Scene 7: SUMMARY & REVISION — Quick recap of everything covered
 
 Rules for image_prompt:
-- Write a detailed, visual description for an AI image generator (Flux model)
-- Describe specific diagrams, objects, colors, labels, and layout
-- Use "educational illustration" or "textbook diagram" style
-- Include text labels in the image where helpful
-- Max 30 words per prompt
+- Write detailed visual descriptions for AI image generation (Flux model)
+- Describe specific diagrams, objects, colors, labels, arrows, and layout
+- Use styles like: "educational illustration", "scientific diagram", "labeled infographic", "textbook figure"
+- Include text labels, annotations, and color coding in the description
+- Each prompt should create a DIFFERENT type of visual (diagram, chart, flowchart, comparison table, mind map, etc.)
+- Max 40 words per prompt
 
 Rules for narration:
-- Write 2-3 sentences explaining the concept shown in the image
-- Speak directly to the student ("Notice how...", "Here you can see...")
-- Include exam-relevant facts and tips
-- Keep each narration under 50 words
+- Write 3-5 natural spoken sentences per scene (60-100 words each)
+- Use a warm, engaging teacher's voice: "Let's look at...", "Notice how...", "The key thing to remember is..."
+- Include specific facts, definitions, formulas, and exam-relevant details
+- End each narration with a connector to the next scene
+- Make it conversational — like a real teacher explaining in class
+
+Rules for title:
+- Short 3-6 word title for the scene (shown as chapter marker)
 
 Format as JSON array:
 [
-  {"image_prompt": "...", "narration": "..."},
-  {"image_prompt": "...", "narration": "..."},
-  {"image_prompt": "...", "narration": "..."},
-  {"image_prompt": "...", "narration": "..."}
+  {"title": "...", "image_prompt": "...", "narration": "..."},
+  {"title": "...", "image_prompt": "...", "narration": "..."},
+  ...
 ]`;
 
-    const sceneRaw = await callOpenRouter(apiKey, sceneSystemMsg, scenePrompt, 1200);
+    const sceneRaw = await callOpenRouter(apiKey, sceneSystemMsg, scenePrompt, 3000);
 
     let scenes = [];
     if (sceneRaw) {
       try {
         const parsed = JSON.parse(sceneRaw);
-        if (Array.isArray(parsed)) scenes = parsed.slice(0, 5);
+        if (Array.isArray(parsed)) scenes = parsed.slice(0, 8);
       } catch {
-        // Try to extract JSON array from response
         const match = sceneRaw.match(/\[[\s\S]*\]/);
         if (match) {
-          try { scenes = JSON.parse(match[0]).slice(0, 5); } catch {}
+          try { scenes = JSON.parse(match[0]).slice(0, 8); } catch {}
         }
       }
     }
 
-    // Validate scene structure
     scenes = scenes.filter(s => s && s.image_prompt && s.narration);
 
     // Fallback scenes if AI fails
-    if (scenes.length === 0) {
+    if (scenes.length < 3) {
       scenes = [
-        { image_prompt: `Educational diagram illustrating key concepts of ${chapter}, textbook style, labeled, colorful`, narration: `Let's start with the fundamental concepts of ${chapter}. Pay close attention to the key terms and definitions shown here.` },
-        { image_prompt: `Detailed infographic showing formulas and definitions for ${chapter}, clean layout, study notes style`, narration: `Here are the important formulas and definitions you need to remember for your exam. Make sure to write these down.` },
-        { image_prompt: `Colorful flowchart showing the process described in ${chapter}, step by step, educational illustration`, narration: `This flowchart breaks down the process step by step. Understanding this sequence is crucial for your exam preparation.` },
-        { image_prompt: `Summary mind map with important points from ${chapter}, exam preparation, key highlights marked`, narration: `Finally, here's a summary of everything important from this chapter. Review these key points before your exam.` },
+        { title: "Introduction", image_prompt: `Colorful educational title card for ${chapter}, modern textbook cover style, CBSE Class ${classNum}, subject text overlay, professional`, narration: `Welcome to this visual lesson on ${chapter}! In the next few minutes, we'll cover all the key concepts you need to know for your exam. Pay close attention to the diagrams and explanations — they'll help you understand and remember everything better. Let's dive right in!` },
+        { title: "Key Concepts", image_prompt: `Detailed educational diagram illustrating the core concepts of ${chapter}, labeled arrows, color-coded sections, textbook style, clean white background`, narration: `Let's start with the fundamentals. Understanding these core concepts is absolutely crucial because most exam questions are based on them. Take a moment to study the diagram carefully — notice how each part connects to the others. This interconnection is what examiners love to test.` },
+        { title: "Process Breakdown", image_prompt: `Step-by-step flowchart showing the main process in ${chapter}, numbered steps, colorful arrows, educational infographic style`, narration: `Now let's break down the main process step by step. Follow the arrows in the flowchart — each step leads naturally to the next. This is a very commonly asked question in board exams, so make sure you can explain each step in your own words.` },
+        { title: "Important Formulas", image_prompt: `Clean infographic showing key formulas and definitions for ${chapter}, highlighted boxes, mathematical notation, study notes layout`, narration: `Here are the important formulas and definitions you must memorize. These appear in almost every exam paper. I recommend writing them down at least three times — research shows that writing helps lock information into your long-term memory.` },
+        { title: "Diagrams & Labels", image_prompt: `Detailed scientific diagram with labeled parts related to ${chapter}, arrows pointing to key features, magnified sections, educational illustration`, narration: `This labeled diagram is worth studying carefully. In board exams, you often get questions asking you to draw and label these structures. Make sure you know every label — even the small details can earn you important marks.` },
+        { title: "Exam Tips", image_prompt: `Exam preparation tips infographic for ${chapter}, common mistakes highlighted in red, correct approaches in green, checklist style`, narration: `Before we wrap up, here are some critical exam tips. These are the most common mistakes students make in this chapter — and how to avoid them. Remember: read the question twice, label your diagrams clearly, and always show your working.` },
+        { title: "Quick Revision", image_prompt: `Summary mind map of ${chapter} with all key points connected, colorful branches, central theme, revision card style`, narration: `And that's a wrap! Let's do a quick recap of everything we covered. Look at this mind map — it connects all the major concepts from this chapter. Use this as your last-minute revision tool before the exam. You've got this — now go ace that test!` },
       ];
     }
 
     console.log(`📝 Generated ${scenes.length} scene descriptions`);
 
-    // ── Step 2: Generate images via Pollinations.ai (FREE, no API key) ──
-    console.log(`🖼️ Step 2: Generating ${scenes.length} images via Pollinations.ai (Flux)...`);
-
     const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
+    // ── Step 2: Generate images + TTS audio in parallel ──
+    console.log(`🖼️ Step 2: Generating ${scenes.length} images + audio...`);
+
     const slidePromises = scenes.map(async (scene, idx) => {
+      const result = { index: idx, title: scene.title || `Scene ${idx + 1}`, narration: scene.narration };
+
+      // Generate image
       try {
         const prompt = encodeURIComponent(scene.image_prompt);
-        const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=576&nologo=true&seed=${Date.now() + idx}`;
+        const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1280&height=720&nologo=true&seed=${Date.now() + idx}`;
 
-        console.log(`  🖼️ Slide ${idx + 1}: "${scene.image_prompt.slice(0, 50)}..."`);
-
-        // Download the image
+        console.log(`  🖼️ Scene ${idx + 1}: image...`);
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout per image
-
+        const timeout = setTimeout(() => controller.abort(), 60000);
         const imgRes = await fetch(imageUrl, { signal: controller.signal });
         clearTimeout(timeout);
 
-        if (!imgRes.ok) {
-          console.warn(`  ⚠️ Slide ${idx + 1}: Pollinations returned ${imgRes.status}`);
-          return null;
+        if (imgRes.ok) {
+          const filename = `vl_${sessionId}_${idx}.jpg`;
+          const filePath = path.join(IMAGES_DIR, filename);
+          const arrayBuf = await imgRes.arrayBuffer();
+          fs.writeFileSync(filePath, Buffer.from(arrayBuf));
+          result.imageUrl = `/images/slides/${filename}`;
+          console.log(`  ✅ Scene ${idx + 1} image saved (${Math.round(arrayBuf.byteLength / 1024)}KB)`);
         }
-
-        const filename = `slide_${sessionId}_${idx}.jpg`;
-        const filePath = path.join(IMAGES_DIR, filename);
-
-        const arrayBuf = await imgRes.arrayBuffer();
-        fs.writeFileSync(filePath, Buffer.from(arrayBuf));
-
-        console.log(`  ✅ Slide ${idx + 1} saved: ${filename} (${Math.round(arrayBuf.byteLength / 1024)}KB)`);
-
-        return {
-          url: `/images/slides/${filename}`,
-          scene: scene.image_prompt,
-          narration: scene.narration,
-          index: idx,
-        };
       } catch (err) {
-        console.warn(`  ⚠️ Slide ${idx + 1} error: ${err.message}`);
-        return null;
+        console.warn(`  ⚠️ Scene ${idx + 1} image error: ${err.message}`);
       }
+
+      // Generate TTS audio using msedge-tts (same voice as audiobook)
+      try {
+        const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+        const audioFilename = `vl_${sessionId}_${idx}.mp3`;
+        const audioPath = path.join(SLIDE_AUDIO_DIR, audioFilename);
+
+        const tts = new MsEdgeTTS();
+        await tts.setMetadata("en-IN-NeerjaExpressiveNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+
+        // Clean narration text
+        const cleanText = scene.narration.replace(/[*#_~`]/g, "").trim();
+        const { audioStream } = tts.toStream(cleanText);
+        const writeStream = fs.createWriteStream(audioPath);
+        audioStream.pipe(writeStream);
+
+        await new Promise((resolve, reject) => {
+          writeStream.on("finish", resolve);
+          writeStream.on("error", reject);
+          audioStream.on("error", reject);
+        });
+
+        result.audioUrl = `/audio/slides/${audioFilename}`;
+        const size = fs.statSync(audioPath).size;
+        console.log(`  🔊 Scene ${idx + 1} audio saved (${Math.round(size / 1024)}KB)`);
+      } catch (err) {
+        console.warn(`  ⚠️ Scene ${idx + 1} audio error: ${err.message}`);
+      }
+
+      return result;
     });
 
     const slideResults = await Promise.all(slidePromises);
-    const slides = slideResults.filter(Boolean).sort((a, b) => a.index - b.index);
+    const slides = slideResults
+      .filter(s => s.imageUrl) // must have an image at minimum
+      .sort((a, b) => a.index - b.index);
 
     if (slides.length === 0) {
       console.warn("⚠️ All slides failed, falling back to YouTube");
       return res.status(502).json({
-        error: "Image generation failed for all scenes.",
+        error: "Visual lesson generation failed.",
         fallback: "youtube",
       });
     }
 
-    console.log(`🖼️ Successfully generated ${slides.length}/${scenes.length} slides`);
+    console.log(`🎬 Visual lesson ready: ${slides.length} scenes with neural voiceover`);
 
-    // ── Step 3: Clean up old slides (keep last 40 files) ──
+    // ── Step 3: Clean up old files (keep last 60) ──
     try {
-      const allFiles = fs.readdirSync(IMAGES_DIR).filter(f => f.startsWith("slide_"));
-      if (allFiles.length > 40) {
-        const sorted = allFiles.sort();
-        sorted.slice(0, sorted.length - 40).forEach(f => fs.unlinkSync(path.join(IMAGES_DIR, f)));
-        console.log(`🧹 Cleaned old slide images`);
+      for (const dir of [IMAGES_DIR, SLIDE_AUDIO_DIR]) {
+        const allFiles = fs.readdirSync(dir).filter(f => f.startsWith("vl_") || f.startsWith("slide_"));
+        if (allFiles.length > 60) {
+          const sorted = allFiles.sort();
+          sorted.slice(0, sorted.length - 60).forEach(f => fs.unlinkSync(path.join(dir, f)));
+        }
       }
     } catch {}
 
@@ -1889,12 +1922,14 @@ Format as JSON array:
       slides,
       sessionId,
       chapter,
+      subject,
+      classNum,
       totalSlides: slides.length,
-      type: "slideshow",
+      type: "video_lesson",
     });
 
   } catch (err) {
-    console.error("Slideshow generation error:", err);
+    console.error("Visual lesson generation error:", err);
     return res.status(500).json({ error: "An unexpected error occurred.", fallback: "youtube" });
   }
 });

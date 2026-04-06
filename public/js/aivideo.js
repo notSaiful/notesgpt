@@ -1,15 +1,18 @@
 // ══════════════════════════════════════════════
-// NotesGPT — AI Visual Slideshow (Pollinations.ai)
-// Generates educational images + narration voiceover
-// Plays as an auto-advancing slideshow with TTS
+// NotesGPT — AI Visual Lesson (Cinema Player)
+// Auto-playing video with Neural TTS voiceover
+// No manual slide navigation — press play, it plays
 // ══════════════════════════════════════════════
 
 const AIVideo = (() => {
   // ── State ──────────────────────────────────
   let slides = [];
-  let currentSlide = 0;
-  let autoPlayTimer = null;
-  let isSpeaking = false;
+  let currentIndex = 0;
+  let isPlaying = false;
+  let isPaused = false;
+  let currentAudio = null;
+  let progressTimer = null;
+  let startTime = 0;
 
   // ── DOM refs ───────────────────────────────
   const els = {};
@@ -28,22 +31,7 @@ const AIVideo = (() => {
     if (els.genBtn) els.genBtn.addEventListener("click", generate);
   }
 
-  // ── Pick best voice for narration ──────────
-  function pickVoice() {
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices.length) return null;
-    const preferred = [
-      "Google UK English Female", "Google US English",
-      "Samantha", "Karen", "Daniel",
-    ];
-    for (const name of preferred) {
-      const v = voices.find(v => v.name === name);
-      if (v) return v;
-    }
-    return voices.find(v => v.lang.startsWith("en")) || voices[0];
-  }
-
-  // ── Generate slides ───────────────────────
+  // ── Generate visual lesson ────────────────
   async function generate() {
     const classNum = window.currentClassNum || "10";
     const subject = window.currentSubject || "";
@@ -53,18 +41,20 @@ const AIVideo = (() => {
 
     // Reset
     slides = [];
-    currentSlide = 0;
-    stopNarration();
+    currentIndex = 0;
+    isPlaying = false;
+    isPaused = false;
+    stopPlayback();
 
     // Show loading
     if (els.loading) els.loading.classList.remove("hidden");
     if (els.error) els.error.classList.add("hidden");
     if (els.player) els.player.classList.add("hidden");
     if (els.genBtn) els.genBtn.disabled = true;
-    if (els.genBtn) els.genBtn.textContent = "🖼️ Generating slides...";
+    if (els.genBtn) els.genBtn.textContent = "🎬 Generating visual lesson...";
 
     const loadingMsg = els.loading ? els.loading.querySelector("p") : null;
-    if (loadingMsg) loadingMsg.textContent = "AI is creating illustrated scenes...";
+    if (loadingMsg) loadingMsg.textContent = "AI is creating your video lesson with neural voiceover... This takes about 30 seconds.";
 
     try {
       const res = await fetch("/api/generate-video", {
@@ -76,207 +66,326 @@ const AIVideo = (() => {
       const data = await res.json();
 
       if (!res.ok || data.fallback === "youtube") {
-        throw new Error(data.error || "Slideshow generation failed.");
+        throw new Error(data.error || "Visual lesson generation failed.");
       }
 
-      if (data.type === "slideshow" && data.slides && data.slides.length > 0) {
+      if (data.slides && data.slides.length > 0) {
         slides = data.slides;
-        showPlayer();
+        buildPlayer(data);
         // ― Analytics ―
-        if (typeof GA !== "undefined") GA.visualLessonGenerated(window.currentClassNum, window.currentSubject, window.currentChapter, slides.length);
-        // ― HubSpot: Track visual lesson ―
+        if (typeof GA !== "undefined") GA.visualLessonGenerated(classNum, subject, chapter, slides.length);
         if (typeof HubTrack !== "undefined") {
-          HubTrack.visualLessonGenerated(window.currentClassNum, window.currentSubject, window.currentChapter, slides.length);
+          HubTrack.visualLessonGenerated(classNum, subject, chapter, slides.length);
         }
       } else {
-        throw new Error("No slides generated.");
+        throw new Error("No scenes generated.");
       }
 
     } catch (err) {
-      console.warn("AI Slideshow failed, using YouTube fallback:", err.message);
+      console.warn("Visual lesson failed:", err.message);
       if (els.loading) els.loading.classList.add("hidden");
-
       openYouTubeFallback(classNum, subject, chapter);
 
       if (els.error) {
         els.error.classList.remove("hidden");
         const msg = els.error.querySelector(".aivideo-error__msg");
-        if (msg) msg.textContent = "Visual generation unavailable. We've opened a YouTube search for you instead!";
+        if (msg) msg.textContent = "Visual lesson unavailable. We've opened a YouTube search for you!";
       }
     } finally {
       if (els.genBtn) {
         els.genBtn.disabled = false;
-        els.genBtn.textContent = "🖼️ Generate Visual Lesson";
+        els.genBtn.textContent = "🎬 Generate Visual Lesson";
       }
     }
   }
 
-  // ── Show the slideshow player ─────────────
-  function showPlayer() {
+  // ── Build the cinema player ───────────────
+  function buildPlayer(data) {
     if (els.loading) els.loading.classList.add("hidden");
     if (els.player) els.player.classList.remove("hidden");
 
-    const playerContainer = els.player;
-    playerContainer.innerHTML = `
-      <div class="slide-viewer">
-        <div class="slide-counter">
-          <span id="slide-num">1</span> / <span id="slide-total">${slides.length}</span>
+    const chapter = data.chapter || window.currentChapter || "";
+    const subject = data.subject || window.currentSubject || "";
+    const classNum = data.classNum || window.currentClassNum || "";
+
+    // Preload all images
+    slides.forEach(s => {
+      const img = new Image();
+      img.src = s.imageUrl;
+    });
+
+    els.player.innerHTML = `
+      <div class="vl-cinema">
+        <!-- Title bar -->
+        <div class="vl-cinema__header">
+          <div class="vl-cinema__title">📺 ${chapter}</div>
+          <div class="vl-cinema__meta">Class ${classNum} · ${subject} · ${slides.length} scenes</div>
         </div>
-        <div class="slide-image-wrap">
-          <img id="slide-image" class="slide-image" src="${slides[0].url}" alt="Educational slide" />
-          <div class="slide-transition-overlay" id="slide-overlay"></div>
+
+        <!-- Main viewport -->
+        <div class="vl-cinema__viewport">
+          <img class="vl-cinema__img vl-cinema__img--active" id="vl-img-a" src="${slides[0].imageUrl}" alt="Visual lesson" />
+          <img class="vl-cinema__img" id="vl-img-b" src="" alt="" />
+          
+          <!-- Scene title overlay -->
+          <div class="vl-cinema__scene-title" id="vl-scene-title">${slides[0].title || "Introduction"}</div>
+          
+          <!-- Big play button (shown initially) -->
+          <button class="vl-cinema__play-big" id="vl-play-big">▶</button>
         </div>
-        <div class="slide-narration" id="slide-narration">
-          <p id="slide-narration-text">${slides[0].narration || ""}</p>
+
+        <!-- Narration subtitle bar -->
+        <div class="vl-cinema__subtitle" id="vl-subtitle">
+          <p id="vl-subtitle-text">${slides[0].narration || ""}</p>
         </div>
-        <div class="slide-controls">
-          <button class="btn btn--outline btn--sm" id="slide-prev-btn" disabled>⏮ Prev</button>
-          <button class="btn btn--outline btn--sm" id="slide-play-btn">▶ Auto-Play</button>
-          <button class="btn btn--accent btn--sm" id="slide-next-btn">Next ⏭</button>
+
+        <!-- Controls bar -->
+        <div class="vl-cinema__controls">
+          <button class="vl-ctrl-btn" id="vl-play-btn">▶</button>
+          <div class="vl-cinema__progress" id="vl-progress-wrap">
+            <div class="vl-cinema__progress-fill" id="vl-progress-fill" style="width:0%"></div>
+            ${slides.map((s, i) => `<div class="vl-cinema__marker" style="left:${((i + 1) / slides.length) * 100}%" title="${s.title || `Scene ${i + 1}`}"></div>`).join("")}
+          </div>
+          <span class="vl-cinema__time" id="vl-time-display">0:00</span>
+          <button class="vl-ctrl-btn" id="vl-mute-btn">🔊</button>
         </div>
-        <div class="slide-thumbnails" id="slide-thumbnails">
+
+        <!-- Scene list (compact) -->
+        <div class="vl-cinema__chapters" id="vl-chapters">
           ${slides.map((s, i) => `
-            <div class="slide-thumb ${i === 0 ? "slide-thumb--active" : ""}" data-index="${i}">
-              <img src="${s.url}" alt="Slide ${i + 1}" />
-              <span class="slide-thumb-num">${i + 1}</span>
+            <div class="vl-chapter ${i === 0 ? "vl-chapter--active" : ""}" data-index="${i}">
+              <span class="vl-chapter__num">${i + 1}</span>
+              <span class="vl-chapter__title">${s.title || `Scene ${i + 1}`}</span>
             </div>
           `).join("")}
         </div>
       </div>
     `;
 
-    // Get element refs
-    const imgEl = document.getElementById("slide-image");
-    const prevBtn = document.getElementById("slide-prev-btn");
-    const nextBtn = document.getElementById("slide-next-btn");
-    const playBtn = document.getElementById("slide-play-btn");
-    const thumbsEl = document.getElementById("slide-thumbnails");
+    // Bind events
+    const playBig = document.getElementById("vl-play-big");
+    const playBtn = document.getElementById("vl-play-btn");
+    const muteBtn = document.getElementById("vl-mute-btn");
+    const chapters = document.getElementById("vl-chapters");
 
-    currentSlide = 0;
-
-    // Narrate first slide
-    narrateSlide(0);
-
-    // Event listeners
-    prevBtn.addEventListener("click", () => {
-      if (currentSlide > 0) goToSlide(currentSlide - 1);
+    playBig.addEventListener("click", () => {
+      playBig.classList.add("hidden");
+      startPlayback();
     });
 
-    nextBtn.addEventListener("click", () => {
-      if (currentSlide < slides.length - 1) goToSlide(currentSlide + 1);
-    });
+    playBtn.addEventListener("click", togglePlayPause);
 
-    playBtn.addEventListener("click", () => {
-      if (autoPlayTimer) {
-        stopAutoPlay();
-        playBtn.textContent = "▶ Auto-Play";
-      } else {
-        startAutoPlay();
-        playBtn.textContent = "⏸ Pause";
+    muteBtn.addEventListener("click", () => {
+      if (currentAudio) {
+        currentAudio.muted = !currentAudio.muted;
+        muteBtn.textContent = currentAudio.muted ? "🔇" : "🔊";
       }
     });
 
-    thumbsEl.addEventListener("click", (e) => {
-      const thumb = e.target.closest(".slide-thumb");
-      if (!thumb) return;
-      const idx = parseInt(thumb.dataset.index, 10);
-      if (!isNaN(idx)) goToSlide(idx);
+    chapters.addEventListener("click", (e) => {
+      const ch = e.target.closest(".vl-chapter");
+      if (!ch) return;
+      const idx = parseInt(ch.dataset.index, 10);
+      if (!isNaN(idx)) {
+        stopPlayback();
+        currentIndex = idx;
+        playScene(idx);
+      }
     });
   }
 
-  // ── Navigate to a slide ───────────────────
-  function goToSlide(idx) {
-    if (idx < 0 || idx >= slides.length) return;
+  // ── Playback engine ───────────────────────
+  function startPlayback() {
+    isPlaying = true;
+    isPaused = false;
+    startTime = Date.now();
+    updatePlayBtn();
+    playScene(currentIndex);
+  }
 
-    const slide = slides[idx];
-    currentSlide = idx;
-
-    // Transition effect
-    const overlay = document.getElementById("slide-overlay");
-    if (overlay) {
-      overlay.classList.add("slide-fade");
-      setTimeout(() => overlay.classList.remove("slide-fade"), 600);
+  function togglePlayPause() {
+    if (!isPlaying) {
+      startPlayback();
+      const playBig = document.getElementById("vl-play-big");
+      if (playBig) playBig.classList.add("hidden");
+      return;
     }
 
-    // Update image
-    const imgEl = document.getElementById("slide-image");
-    if (imgEl) imgEl.src = slide.url;
-
-    // Update narration text
-    const narrationText = document.getElementById("slide-narration-text");
-    if (narrationText) narrationText.textContent = slide.narration || "";
-
-    // Update counter
-    const numEl = document.getElementById("slide-num");
-    if (numEl) numEl.textContent = idx + 1;
-
-    // Update buttons
-    const prevBtn = document.getElementById("slide-prev-btn");
-    const nextBtn = document.getElementById("slide-next-btn");
-    if (prevBtn) prevBtn.disabled = idx === 0;
-    if (nextBtn) nextBtn.disabled = idx === slides.length - 1;
-
-    // Update thumbnails
-    document.querySelectorAll(".slide-thumb").forEach((el, i) => {
-      el.classList.toggle("slide-thumb--active", i === idx);
-    });
-
-    // Narrate
-    narrateSlide(idx);
+    if (isPaused) {
+      // Resume
+      isPaused = false;
+      if (currentAudio) currentAudio.play();
+      updatePlayBtn();
+    } else {
+      // Pause
+      isPaused = true;
+      if (currentAudio) currentAudio.pause();
+      updatePlayBtn();
+    }
   }
 
-  // ── Narrate a slide using browser TTS ─────
-  function narrateSlide(idx) {
-    stopNarration();
+  function stopPlayback() {
+    isPlaying = false;
+    isPaused = false;
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+    clearInterval(progressTimer);
+    updatePlayBtn();
+  }
+
+  function updatePlayBtn() {
+    const btn = document.getElementById("vl-play-btn");
+    if (!btn) return;
+    btn.textContent = (!isPlaying || isPaused) ? "▶" : "⏸";
+  }
+
+  // ── Play a single scene ───────────────────
+  function playScene(idx) {
+    if (idx >= slides.length) {
+      // Video finished
+      isPlaying = false;
+      updatePlayBtn();
+      // Show replay
+      const playBig = document.getElementById("vl-play-big");
+      if (playBig) {
+        playBig.textContent = "↻";
+        playBig.classList.remove("hidden");
+      }
+      currentIndex = 0;
+
+      // GA event
+      if (typeof GA !== "undefined") {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        GA.send("visual_lesson_completed", {
+          event_category: "study_flow",
+          scenes_watched: slides.length,
+          watch_time_seconds: elapsed,
+        });
+      }
+      return;
+    }
 
     const slide = slides[idx];
-    if (!slide || !slide.narration || !window.speechSynthesis) return;
+    currentIndex = idx;
 
-    const utterance = new SpeechSynthesisUtterance(slide.narration);
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
+    // Update scene title
+    const titleEl = document.getElementById("vl-scene-title");
+    if (titleEl) {
+      titleEl.textContent = slide.title || `Scene ${idx + 1}`;
+      titleEl.classList.add("vl-title-animate");
+      setTimeout(() => titleEl.classList.remove("vl-title-animate"), 2000);
+    }
 
-    const voice = pickVoice();
-    if (voice) utterance.voice = voice;
+    // Crossfade images
+    crossfadeImage(slide.imageUrl);
 
-    utterance.onend = () => {
-      isSpeaking = false;
-      // If auto-play is active, advance after narration ends
-      if (autoPlayTimer && currentSlide < slides.length - 1) {
-        setTimeout(() => goToSlide(currentSlide + 1), 1500);
+    // Update subtitle
+    const subtitleText = document.getElementById("vl-subtitle-text");
+    if (subtitleText) subtitleText.textContent = slide.narration || "";
+
+    // Update chapter markers
+    document.querySelectorAll(".vl-chapter").forEach((el, i) => {
+      el.classList.toggle("vl-chapter--active", i === idx);
+      if (i < idx) el.classList.add("vl-chapter--done");
+    });
+
+    // Update progress
+    updateProgress(idx);
+
+    // Play audio narration
+    if (slide.audioUrl) {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
       }
+
+      currentAudio = new Audio(slide.audioUrl);
+      const muteBtn = document.getElementById("vl-mute-btn");
+      if (muteBtn && muteBtn.textContent === "🔇") {
+        currentAudio.muted = true;
+      }
+
+      currentAudio.onended = () => {
+        // Small pause between scenes, then advance
+        setTimeout(() => {
+          if (isPlaying && !isPaused) {
+            playScene(idx + 1);
+          }
+        }, 800);
+      };
+
+      currentAudio.onerror = () => {
+        // If audio fails, wait 5 seconds then advance
+        setTimeout(() => {
+          if (isPlaying && !isPaused) playScene(idx + 1);
+        }, 5000);
+      };
+
+      currentAudio.play().catch(() => {
+        // Autoplay blocked — try again after user interaction
+        setTimeout(() => {
+          if (isPlaying && !isPaused) playScene(idx + 1);
+        }, 5000);
+      });
+    } else {
+      // No audio — auto-advance after 6 seconds
+      setTimeout(() => {
+        if (isPlaying && !isPaused) playScene(idx + 1);
+      }, 6000);
+    }
+  }
+
+  // ── Crossfade images (Ken Burns effect) ───
+  let useImgA = true;
+  function crossfadeImage(src) {
+    const imgA = document.getElementById("vl-img-a");
+    const imgB = document.getElementById("vl-img-b");
+    if (!imgA || !imgB) return;
+
+    const incoming = useImgA ? imgB : imgA;
+    const outgoing = useImgA ? imgA : imgB;
+
+    incoming.src = src;
+    incoming.onload = () => {
+      incoming.classList.add("vl-cinema__img--active");
+      outgoing.classList.remove("vl-cinema__img--active");
     };
 
-    isSpeaking = true;
-    window.speechSynthesis.speak(utterance);
+    // Randomize Ken Burns direction
+    const directions = ["vl-kb-1", "vl-kb-2", "vl-kb-3", "vl-kb-4"];
+    const pick = directions[Math.floor(Math.random() * directions.length)];
+    incoming.className = `vl-cinema__img vl-cinema__img--active ${pick}`;
+
+    useImgA = !useImgA;
   }
 
-  function stopNarration() {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    isSpeaking = false;
+  // ── Progress bar ──────────────────────────
+  function updateProgress(idx) {
+    const fill = document.getElementById("vl-progress-fill");
+    const timeDisplay = document.getElementById("vl-time-display");
+    if (!fill) return;
+
+    // Scene-based progress
+    const pct = ((idx + 1) / slides.length) * 100;
+    fill.style.width = `${pct}%`;
+
+    // Time display
+    clearInterval(progressTimer);
+    progressTimer = setInterval(() => {
+      if (!startTime || isPaused) return;
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      if (timeDisplay) timeDisplay.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+    }, 1000);
   }
 
-  // ── Auto-play ─────────────────────────────
-  function startAutoPlay() {
-    if (autoPlayTimer) return;
-    autoPlayTimer = true; // flag — actual advancing is driven by narration onend
-    // If not currently speaking, start with next slide
-    if (!isSpeaking && currentSlide < slides.length - 1) {
-      goToSlide(currentSlide + 1);
-    }
-  }
-
-  function stopAutoPlay() {
-    autoPlayTimer = null;
-  }
-
-  // ── YouTube Fallback ───────────────────────
+  // ── YouTube Fallback ──────────────────────
   function openYouTubeFallback(classNum, subject, chapter) {
     const query = encodeURIComponent(
-      `CBSE Class ${classNum} ${subject} ${chapter} explanation one shot`.trim()
+      `CBSE Class ${classNum} ${subject} ${chapter} explanation one shot`
     );
     window.open(`https://www.youtube.com/results?search_query=${query}`, "_blank");
   }

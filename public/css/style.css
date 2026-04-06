@@ -3502,10 +3502,7 @@ body {
   /* Mind map */
   .mm-canvas { overflow-x: auto; }
 
-  /* AI visual lesson */
-  .slide-controls { flex-wrap: wrap; }
-  .slide-thumbnails { gap: 6px; }
-  .slide-thumb { width: 64px; height: 36px; }
+  /* AI visual lesson — handled in cinema player section */
 }
 
 /* ── Mobile Portrait (≤480px) ─────────────── */
@@ -3847,124 +3844,269 @@ a, button, input, select, textarea {
 }
 
 /* ══════════════════════════════════════════════
-   AI VISUAL LESSON — SLIDESHOW PLAYER
+   AI VISUAL LESSON — CINEMA PLAYER
    ══════════════════════════════════════════════ */
-.slide-viewer {
+.vl-cinema {
   margin-top: 16px;
-}
-
-.slide-counter {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--accent-light);
-  text-align: center;
-  margin-bottom: 10px;
-}
-
-.slide-image-wrap {
-  position: relative;
-  width: 100%;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   background: #09090b;
-  aspect-ratio: 16/9;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
 }
 
-.slide-image {
+.vl-cinema__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.vl-cinema__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f4f4f5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+.vl-cinema__meta {
+  font-size: 0.75rem;
+  color: #71717a;
+  font-weight: 500;
+}
+
+/* Viewport — 16:9 */
+.vl-cinema__viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+  overflow: hidden;
+}
+
+.vl-cinema__img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
-  transition: opacity 0.4s ease;
+  opacity: 0;
+  transition: opacity 1s ease-in-out;
+  will-change: opacity, transform;
+}
+.vl-cinema__img--active {
+  opacity: 1;
 }
 
-.slide-transition-overlay {
+/* Ken Burns variations */
+.vl-kb-1 { animation: kenBurns1 12s ease-in-out forwards; }
+.vl-kb-2 { animation: kenBurns2 12s ease-in-out forwards; }
+.vl-kb-3 { animation: kenBurns3 12s ease-in-out forwards; }
+.vl-kb-4 { animation: kenBurns4 12s ease-in-out forwards; }
+
+@keyframes kenBurns1 {
+  from { transform: scale(1) translate(0, 0); }
+  to   { transform: scale(1.08) translate(-1%, -1%); }
+}
+@keyframes kenBurns2 {
+  from { transform: scale(1.08) translate(-1%, 0); }
+  to   { transform: scale(1) translate(1%, 1%); }
+}
+@keyframes kenBurns3 {
+  from { transform: scale(1) translate(1%, -1%); }
+  to   { transform: scale(1.06) translate(0, 1%); }
+}
+@keyframes kenBurns4 {
+  from { transform: scale(1.06) translate(0, 1%); }
+  to   { transform: scale(1) translate(-1%, 0); }
+}
+
+/* Scene title overlay */
+.vl-cinema__scene-title {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  z-index: 5;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.vl-title-animate {
+  animation: titlePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+@keyframes titlePop {
+  from { opacity: 0; transform: translateY(-8px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Big play button */
+.vl-cinema__play-big {
   position: absolute;
   inset: 0;
-  background: #000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  border: none;
+  cursor: pointer;
+  z-index: 10;
+  font-size: 4rem;
+  color: #fff;
+  transition: background 0.3s ease;
 }
-
-.slide-transition-overlay.slide-fade {
-  animation: slideFadeThrough 0.6s ease;
+.vl-cinema__play-big:hover {
+  background: rgba(0,0,0,0.6);
 }
+.vl-cinema__play-big.hidden { display: none; }
 
-@keyframes slideFadeThrough {
-  0%   { opacity: 0; }
-  40%  { opacity: 0.7; }
-  100% { opacity: 0; }
+/* Subtitle bar */
+.vl-cinema__subtitle {
+  padding: 14px 18px;
+  background: rgba(139, 92, 246, 0.06);
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+  min-height: 60px;
 }
-
-.slide-narration {
-  margin-top: 12px;
-  padding: 14px 16px;
-  background: rgba(139, 92, 246, 0.08);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 10px;
-}
-
-.slide-narration p {
+.vl-cinema__subtitle p {
   font-size: 0.88rem;
-  color: var(--text-normal);
+  color: #d4d4d8;
   line-height: 1.6;
   margin: 0;
 }
 
-.slide-controls {
+/* Controls bar */
+.vl-cinema__controls {
   display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-top: 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(0,0,0,0.3);
+  border-top: 1px solid rgba(255,255,255,0.04);
 }
 
-.slide-thumbnails {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.slide-thumb {
-  position: relative;
-  flex-shrink: 0;
-  width: 80px;
-  height: 45px;
-  border-radius: 6px;
-  overflow: hidden;
-  border: 2px solid rgba(255,255,255,0.08);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  opacity: 0.6;
-}
-
-.slide-thumb:hover {
-  opacity: 0.9;
-  border-color: rgba(139,92,246,0.5);
-}
-
-.slide-thumb--active {
-  opacity: 1;
-  border-color: var(--accent);
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
-}
-
-.slide-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.slide-thumb-num {
-  position: absolute;
-  bottom: 2px;
-  right: 4px;
-  font-size: 0.6rem;
-  font-weight: 700;
+.vl-ctrl-btn {
+  background: none;
+  border: none;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  font-size: 1.1rem;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+.vl-ctrl-btn:hover { background: rgba(255,255,255,0.1); }
+
+/* Progress bar */
+.vl-cinema__progress {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  position: relative;
+  cursor: pointer;
+}
+.vl-cinema__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+.vl-cinema__marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 10px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  transform: translateX(-1px);
+}
+.vl-cinema__time {
+  font-size: 0.75rem;
+  color: #71717a;
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Chapter list */
+.vl-cinema__chapters {
+  display: flex;
+  overflow-x: auto;
+  gap: 4px;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  background: rgba(0,0,0,0.15);
+  scrollbar-width: none;
+}
+.vl-cinema__chapters::-webkit-scrollbar { display: none; }
+
+.vl-chapter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: #71717a;
+  border: 1px solid transparent;
+}
+.vl-chapter:hover {
+  color: #d4d4d8;
+  background: rgba(255,255,255,0.05);
+}
+.vl-chapter--active {
+  color: #fff;
+  background: rgba(139,92,246,0.15);
+  border-color: rgba(139,92,246,0.3);
+}
+.vl-chapter--done { color: #a78bfa; }
+.vl-chapter__num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+.vl-chapter--active .vl-chapter__num {
+  background: #7c3aed;
+  color: #fff;
+}
+.vl-chapter--done .vl-chapter__num {
+  background: rgba(139,92,246,0.3);
+}
+.vl-chapter__title {
+  font-weight: 600;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .vl-cinema__header { padding: 10px 14px; }
+  .vl-cinema__title { font-size: 0.85rem; max-width: 55%; }
+  .vl-cinema__subtitle { padding: 10px 14px; }
+  .vl-cinema__play-big { font-size: 3rem; }
+  .vl-chapter { padding: 4px 8px; font-size: 0.72rem; }
 }
 
 
