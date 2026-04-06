@@ -202,21 +202,27 @@ const TestEngine = (() => {
     // Per-question breakdown
     els.breakdown.innerHTML = results.map((r, i) => {
       const q = questions[i];
-      const typeLabels = { mcq: "MCQ", short: "Short", long: "Long" };
+      const typeLabels = { mcq: "MCQ", short: "Short", long: "Long", case: "Case" };
       const isGood = r.marks_awarded >= r.total_marks * 0.7;
       const isPoor = r.marks_awarded < r.total_marks * 0.4;
       const statusClass = isGood ? "good" : isPoor ? "poor" : "partial";
+      const statusIcon = r.marks_awarded >= r.total_marks ? "✅" : r.marks_awarded === 0 ? "❌" : "🟡";
+      const studentAnswer = userAnswers[i] || "(no answer)";
 
       return `
         <div class="test-result-card test-result-card--${statusClass}">
           <div class="test-result-card__header">
-            <span class="test-result-card__num">Q${i + 1}</span>
+            <span class="test-result-card__num">${statusIcon} Q${i + 1}</span>
             <span class="test-result-card__type">${typeLabels[q.type] || "Q"}</span>
             <span class="test-result-card__score">${r.marks_awarded}/${r.total_marks}</span>
           </div>
-          <p class="test-result-card__q">${q.question.slice(0, 100)}${q.question.length > 100 ? "…" : ""}</p>
-          <p class="test-result-card__feedback">${r.feedback}</p>
-          ${r.improvement_tip ? `<p class="test-result-card__tip">💡 ${r.improvement_tip}</p>` : ""}
+          <p class="test-result-card__q"><strong>Question:</strong> ${q.question}</p>
+          <div class="test-result-card__answers">
+            <p class="test-result-card__student-ans"><strong>Your answer:</strong> <span style="color:${isPoor ? 'var(--error, #e74c3c)' : isGood ? 'var(--success, #27ae60)' : 'var(--warning, #f39c12)'}">${studentAnswer}</span></p>
+            ${r.correct_answer ? `<p class="test-result-card__correct-ans"><strong>✅ Correct answer:</strong> <span style="color:var(--success, #27ae60)">${r.correct_answer}</span></p>` : ""}
+          </div>
+          <p class="test-result-card__feedback"><strong>Feedback:</strong> ${r.feedback}</p>
+          ${r.improvement_tip ? `<p class="test-result-card__tip">💡 <strong>Tip:</strong> ${r.improvement_tip}</p>` : ""}
         </div>
       `;
     }).join("");

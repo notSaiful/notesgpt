@@ -724,7 +724,11 @@ app.post("/api/evaluate-test", async (req, res) => {
         preScored[i] = {
           marks_awarded: 0,
           total_marks: q.marks,
-          feedback: answer.length === 0 ? "No answer provided." : "Answer too short to evaluate.",
+          is_correct: false,
+          correct_answer: q.answer || "",
+          feedback: answer.length === 0
+            ? `No answer provided. The correct answer is: ${q.answer}`
+            : `Answer too short. The correct answer is: ${q.answer}`,
           improvement_tip: "Attempt the question fully. Even partial answers can earn marks.",
         };
       } else {
@@ -752,32 +756,43 @@ Key Points: ${(q.key_points || []).join(", ")}
 Student's Answer: ${item.userAnswer}`;
     }).join("\n\n---\n\n");
 
-    const systemMsg = "You are a strict CBSE exam evaluator. Grade answers HONESTLY. If an answer is wrong, incomplete, or off-topic, give 0 or low marks. Do NOT be generous. Output ONLY a valid JSON array, no other text.";
-    const prompt = `Evaluate a CBSE Class ${classNum || "10"} student's test answers STRICTLY.
+    const systemMsg = `You are an expert CBSE exam evaluator. Your job is to CAREFULLY compare each student's answer against the correct answer and key points. Be HONEST and PRECISE — award marks ONLY for correct content. If the answer is wrong, say so clearly and give the correct answer. Output ONLY a valid JSON array.`;
 
-Here are the questions, correct answers, and student's answers:
+    const prompt = `You are evaluating a CBSE Class ${classNum || "10"} student's test. For EACH question below, carefully compare the student's answer with the correct answer.
 
 ${qaText}
 
-STRICT RULES:
-- If student's answer is WRONG or completely off-topic: give 0 marks
-- If answer is partially correct: give proportional partial marks
-- If answer is correct but incomplete: deduct marks for missing key points
-- NEVER give full marks unless ALL key points are covered
-- Be FAIR but STRICT, like a real CBSE examiner
+EVALUATION RULES — FOLLOW THESE EXACTLY:
 
-Format strictly as a JSON array (no other text, no markdown, just the JSON):
+1. READ the correct answer and key points carefully
+2. READ the student's answer carefully
+3. CHECK: Does the student's answer actually match the correct answer?
+   - For MCQ: Is the selected option correct? If wrong → 0 marks
+   - For Short Answer: Are the key facts/definitions/formulas present and correct?
+   - For Long Answer: Are ALL key points covered? Is the explanation accurate?
+4. Be HONEST:
+   - WRONG answer → 0 marks, explain the correct answer
+   - PARTIALLY correct → proportional marks, state what was missing
+   - CORRECT but incomplete → deduct for missing key points
+   - FULLY correct with all key points → full marks
+5. ALWAYS state the correct answer in your feedback when the student gets it wrong or partially wrong
+6. NEVER give marks for vague, off-topic, or incorrect responses just because they are long
+
+For EACH question, output a JSON object with these EXACT fields:
 
 [
   {
-    "marks_awarded": 0,
-    "total_marks": 3,
-    "feedback": "Brief feedback on what was right/wrong",
-    "improvement_tip": "Specific tip to improve"
+    "marks_awarded": <number between 0 and total_marks>,
+    "total_marks": <from the question>,
+    "is_correct": <true if marks_awarded equals total_marks, false otherwise>,
+    "correct_answer": "<the actual correct answer, stated clearly — ALWAYS include this>",
+    "feedback": "<2-3 sentences: what the student got right, what they got wrong, and what the correct answer is>",
+    "improvement_tip": "<1 specific, actionable tip to answer this type of question better>"
   }
 ]
 
-Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
+CRITICAL: Output ONLY the JSON array. No markdown, no explanation outside the JSON.`;
+
 
     const raw = await callOpenRouter(apiKey, systemMsg, prompt, 3000);
 
@@ -826,9 +841,13 @@ Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
         preScored[item.originalIndex] = {
           marks_awarded: marks,
           total_marks: q.marks,
+          is_correct: marks >= q.marks,
+          correct_answer: q.answer,
           feedback: marks === 0
-            ? "Answer does not match expected response."
-            : `Partially correct. ${matched}/${totalPoints} key points covered.`,
+            ? `Incorrect. The correct answer is: ${q.answer}`
+            : marks >= q.marks
+              ? "Correct! All key points covered."
+              : `Partially correct (${matched}/${totalPoints} key points). Correct answer: ${q.answer}`,
           improvement_tip: "Review the correct answer and ensure all key points are included.",
         };
       });
@@ -837,9 +856,12 @@ Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
       toEvaluate.forEach((item, aiIdx) => {
         const r = aiResults[aiIdx] || {};
         const maxMarks = item.question.marks;
+        const awarded = Math.min(Math.max(Number(r.marks_awarded) || 0, 0), maxMarks);
         preScored[item.originalIndex] = {
-          marks_awarded: Math.min(Math.max(Number(r.marks_awarded) || 0, 0), maxMarks),
+          marks_awarded: awarded,
           total_marks: maxMarks,
+          is_correct: awarded >= maxMarks,
+          correct_answer: String(r.correct_answer || item.question.answer || "").trim(),
           feedback: String(r.feedback || "Evaluated by AI.").trim(),
           improvement_tip: String(r.improvement_tip || "").trim(),
         };
@@ -850,6 +872,8 @@ Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
     const finalResults = preScored.map((r, i) => r || {
       marks_awarded: 0,
       total_marks: questions[i].marks,
+      is_correct: false,
+      correct_answer: questions[i].answer || "",
       feedback: "Could not evaluate this answer.",
       improvement_tip: "",
     });
