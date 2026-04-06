@@ -1,13 +1,19 @@
 // ══════════════════════════════════════════════
-// NotesGPT — Audiobook System (Edge Neural TTS MP3)
-// Generates AI narration script → real MP3 via Edge TTS
-// Downloadable, playable from anywhere
+// NotesGPT — Audiobook System (Web Speech API)
+// Generates AI narration script → plays via browser TTS
+// Proper chunking, voice selection, progress tracking
 // ══════════════════════════════════════════════
 
 const AudioPlayer = (() => {
   // ── State ──────────────────────────────────
-  let isPlaying = false;
-  let audioElement = null;
+  let sentences   = [];   // array of sentence strings
+  let currentIdx  = 0;
+  let isPlaying   = false;
+  let isPaused    = false;
+  let playbackRate = 1.0;
+  let selectedVoice = null;
+  let utteranceInProgress = null;
+  let fullScript  = "";
 
   // ── DOM refs ───────────────────────────────
   const els = {};
@@ -25,16 +31,76 @@ const AudioPlayer = (() => {
     els.loadingP    = els.loading ? els.loading.querySelector("p") : null;
   }
 
+  // ── Pick best available voice ──────────────
+  function pickVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    // Priority order — best sounding voices for English narration
+    const preferred = [
+      "Google UK English Female",
+      "Google US English",
+      "Google UK English Male",
+      "Microsoft Zira - English (United States)",
+      "Microsoft David - English (United States)",
+      "Samantha",
+      "Karen",
+      "Daniel",
+    ];
+
+    for (const name of preferred) {
+      const v = voices.find(v => v.name === name);
+      if (v) return v;
+    }
+
+    // Fallback: first English voice
+    return voices.find(v => v.lang.startsWith("en")) || voices[0];
+  }
+
+  // ── Split script into sentence chunks ──────
+  // Keeps chunks ≤200 chars to avoid Chrome's 15s TTS timeout bug
+  function splitIntoChunks(text) {
+    // Split on sentence boundaries
+    const raw = text.match(/[^.!?…]+[.!?…]+["']?\s*/g) || [text];
+    const chunks = [];
+    let buffer = "";
+
+    for (const sentence of raw) {
+      if ((buffer + sentence).length > 200 && buffer.trim()) {
+        chunks.push(buffer.trim());
+        buffer = sentence;
+      } else {
+        buffer += sentence;
+      }
+    }
+    if (buffer.trim()) chunks.push(buffer.trim());
+    return chunks;
+  }
+
   // ── Init ───────────────────────────────────
   function init() {
     cacheDom();
     if (els.listenBtn) els.listenBtn.addEventListener("click", generate);
     if (els.playBtn)   els.playBtn.addEventListener("click", togglePlayback);
     if (els.speedBtn)  els.speedBtn.addEventListener("click", cycleSpeed);
+
+    // Load voices (Chrome loads them asynchronously)
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        selectedVoice = pickVoice();
+      };
+    }
+    selectedVoice = pickVoice();
   }
 
-  function show() { if (els.section) els.section.classList.remove("hidden"); }
-  function hide() { stop(); if (els.section) els.section.classList.add("hidden"); }
+  function show() {
+    if (els.section) els.section.classList.remove("hidden");
+  }
+
+  function hide() {
+    stop();
+    if (els.section) els.section.classList.add("hidden");
+  }
 
   // ── Generate audiobook ────────────────────
   async function generate() {
@@ -49,23 +115,14 @@ const AudioPlayer = (() => {
     stop();
     if (els.player)  els.player.classList.add("hidden");
     if (els.loading) els.loading.classList.remove("hidden");
-    if (els.charLabel) { els.charLabel.style.display = "none"; }
+    if (els.charLabel) { els.charLabel.style.display = "none"; els.charLabel.textContent = ""; }
     if (els.loadingP) els.loadingP.textContent = "AI is writing your narration script…";
     if (els.listenBtn) {
       els.listenBtn.disabled = true;
-      els.listenBtn.textContent = "⏳ Generating audiobook…";
+      els.listenBtn.textContent = "⏳ Generating script…";
     }
 
-    // Remove old download button if present
-    const oldDl = document.getElementById("audio-download-btn");
-    if (oldDl) oldDl.remove();
-
     try {
-      // Update loading message after a delay
-      setTimeout(() => {
-        if (els.loadingP) els.loadingP.textContent = "Converting to high-quality MP3 audio…";
-      }, 5000);
-
       const res = await fetch("/api/generate-audio-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,15 +135,18 @@ const AudioPlayer = (() => {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate audio.");
+      if (!res.ok) throw new Error(data.error || "Failed to generate script.");
 
-      if (data.type === "mp3" && data.audioUrl) {
-        // ✅ Real MP3 generated — show native audio player
-        showMP3Player(data);
-      } else {
-        // Fallback: browser TTS
-        showBrowserTTSPlayer(data.script);
-      }
+      fullScript = data.script || summaryText;
+      sentences  = splitIntoChunks(fullScript);
+      currentIdx = 0;
+
+      const mins = data.estimatedMinutes || Math.ceil(sentences.length * 0.12);
+      showPlayer(mins);
+
+      // Auto-start playing
+      setTimeout(() => startPlayback(), 300);
+
     } catch (err) {
       if (els.loading) els.loading.classList.add("hidden");
       if (els.charLabel) {
@@ -101,167 +161,142 @@ const AudioPlayer = (() => {
     }
   }
 
-  // ── Show real MP3 player ───────────────────
-  function showMP3Player(data) {
-    if (els.loading) els.loading.classList.add("hidden");
-    if (els.player)  els.player.classList.remove("hidden");
-    if (els.modeLabel) els.modeLabel.textContent = "🎧 AI Audiobook (HD)";
-    if (els.playBtn) els.playBtn.textContent = "▶";
+  // ── Show player UI ─────────────────────────
+  function showPlayer(estimatedMins) {
+    if (els.loading)   els.loading.classList.add("hidden");
+    if (els.player)    els.player.classList.remove("hidden");
+    if (els.modeLabel) els.modeLabel.textContent = "🎧 AI Audiobook";
+    if (els.playBtn)   els.playBtn.textContent = "⏸";
+    if (els.timeText)  els.timeText.textContent = `~${estimatedMins || 3} min`;
     if (els.charLabel) {
       els.charLabel.style.display = "block";
-      els.charLabel.textContent = `✅ High-quality MP3 ready (~${data.estimatedMinutes || 3} min)`;
+      els.charLabel.textContent   = "📖 Preparing narration…";
     }
-
-    // Create hidden audio element
-    if (audioElement) { audioElement.pause(); audioElement.src = ""; }
-    audioElement = new Audio(data.audioUrl);
-    audioElement.preload = "auto";
-
-    // Time update
-    audioElement.addEventListener("timeupdate", () => {
-      if (!audioElement.duration) return;
-      const pct = (audioElement.currentTime / audioElement.duration) * 100;
-      if (els.progressBar) els.progressBar.style.width = `${pct}%`;
-
-      const elapsed  = formatTime(audioElement.currentTime);
-      const total    = formatTime(audioElement.duration);
-      if (els.timeText) els.timeText.textContent = `${elapsed} / ${total}`;
-    });
-
-    audioElement.addEventListener("ended", () => {
-      isPlaying = false;
-      if (els.playBtn) els.playBtn.textContent = "▶";
-      if (els.charLabel) els.charLabel.textContent = "✅ Audiobook complete! Great revision session.";
-    });
-
-    audioElement.addEventListener("error", () => {
-      if (els.charLabel) {
-        els.charLabel.textContent = "⚠️ Audio failed to load. Try regenerating.";
-      }
-    });
-
-    // Add download button
-    const downloadBtn = document.createElement("button");
-    downloadBtn.id = "audio-download-btn";
-    downloadBtn.className = "btn btn--outline";
-    downloadBtn.style.cssText = "margin-top:12px; font-size:0.85rem;";
-    downloadBtn.textContent = "⬇ Download MP3";
-    downloadBtn.addEventListener("click", () => {
-      const a = document.createElement("a");
-      a.href = data.downloadUrl;
-      a.download = `NotesGPT_${(window.currentChapter || "audiobook").replace(/\s+/g, "_")}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    });
-
-    // Insert download button after the player
-    const playerEl = els.player;
-    if (playerEl && playerEl.parentNode) {
-      // Remove old download btn if any
-      const existing = document.getElementById("audio-download-btn");
-      if (existing) existing.remove();
-      playerEl.parentNode.insertBefore(downloadBtn, playerEl.nextSibling);
-    }
-
-    // Auto-start
-    setTimeout(() => {
-      audioElement.play().then(() => {
-        isPlaying = true;
-        if (els.playBtn) els.playBtn.textContent = "⏸";
-      }).catch(() => {});
-    }, 300);
   }
 
-  // ── Playback controls ─────────────────────
-  function togglePlayback() {
-    if (!audioElement) return;
+  // ── Playback ───────────────────────────────
+  function startPlayback() {
+    isPlaying = true;
+    isPaused  = false;
+    if (els.playBtn) els.playBtn.textContent = "⏸";
+    speakChunk(currentIdx);
+  }
 
-    if (isPlaying) {
-      audioElement.pause();
+  function speakChunk(idx) {
+    if (idx >= sentences.length) {
+      onComplete();
+      return;
+    }
+
+    currentIdx = idx;
+    updateProgress(idx);
+
+    if (els.charLabel) {
+      const preview = sentences[idx].slice(0, 60);
+      els.charLabel.textContent = `📖 ${idx + 1}/${sentences.length}: "${preview}…"`;
+    }
+
+    // Cancel any existing utterance
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(sentences[idx]);
+    utterance.rate  = playbackRate;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Re-pick voice each utterance (Chrome sometimes loses it)
+    if (!selectedVoice) selectedVoice = pickVoice();
+    if (selectedVoice)  utterance.voice = selectedVoice;
+
+    utterance.onend = () => {
+      if (isPlaying && !isPaused) {
+        speakChunk(idx + 1);
+      }
+    };
+
+    utterance.onerror = (e) => {
+      if (e.error === "interrupted" || e.error === "canceled") return;
+      console.warn("TTS error:", e.error, "— skipping chunk", idx);
+      if (isPlaying && !isPaused) speakChunk(idx + 1);
+    };
+
+    utteranceInProgress = utterance;
+    window.speechSynthesis.speak(utterance);
+
+    // Chrome bug workaround: speechSynthesis pauses after ~15s in background
+    // Keep it alive by nudging it every 10s
+    if (!window._ttsBugFix) {
+      window._ttsBugFix = setInterval(() => {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }, 10000);
+    }
+  }
+
+  function togglePlayback() {
+    if (!sentences.length) return;
+
+    if (isPlaying && !isPaused) {
+      // Pause
+      window.speechSynthesis.pause();
       isPlaying = false;
+      isPaused  = true;
       if (els.playBtn) els.playBtn.textContent = "▶";
-    } else {
-      audioElement.play().catch(() => {});
+    } else if (isPaused) {
+      // Resume from pause
+      window.speechSynthesis.resume();
       isPlaying = true;
+      isPaused  = false;
       if (els.playBtn) els.playBtn.textContent = "⏸";
+    } else {
+      // Fresh start or restart
+      startPlayback();
     }
   }
 
   function stop() {
     isPlaying = false;
-    if (audioElement) { audioElement.pause(); audioElement.currentTime = 0; }
-    if (els.playBtn) els.playBtn.textContent = "▶";
-    if (els.progressBar) els.progressBar.style.width = "0%";
+    isPaused  = false;
+    window.speechSynthesis.cancel();
+    utteranceInProgress = null;
+    currentIdx = 0;
+    if (window._ttsBugFix) { clearInterval(window._ttsBugFix); window._ttsBugFix = null; }
+    if (els.playBtn)    els.playBtn.textContent = "▶";
+    updateProgress(0);
   }
 
+  function onComplete() {
+    isPlaying  = false;
+    isPaused   = false;
+    currentIdx = 0;
+    if (window._ttsBugFix) { clearInterval(window._ttsBugFix); window._ttsBugFix = null; }
+    if (els.playBtn)   els.playBtn.textContent = "▶";
+    if (els.charLabel) els.charLabel.textContent = "✅ Audiobook complete! Great revision session.";
+    if (els.timeText)  els.timeText.textContent = "Done";
+    updateProgress(100);
+  }
+
+  // ── Speed control ──────────────────────────
   function cycleSpeed() {
     const speeds = [1.0, 1.25, 1.5, 1.75, 0.75];
-    const current = audioElement ? audioElement.playbackRate : 1;
-    const idx = speeds.indexOf(current);
-    const newSpeed = speeds[(idx + 1) % speeds.length];
-    if (els.speedBtn) els.speedBtn.textContent = `${newSpeed}x`;
-    if (audioElement) audioElement.playbackRate = newSpeed;
-  }
+    const idx    = speeds.indexOf(playbackRate);
+    playbackRate  = speeds[(idx + 1) % speeds.length];
+    if (els.speedBtn) els.speedBtn.textContent = `${playbackRate}x`;
 
-  // ── Browser TTS fallback ──────────────────
-  function showBrowserTTSPlayer(script) {
-    if (els.loading) els.loading.classList.add("hidden");
-    if (els.player)  els.player.classList.remove("hidden");
-    if (els.modeLabel) els.modeLabel.textContent = "🎧 Browser TTS (Fallback)";
-    if (els.playBtn) els.playBtn.textContent = "▶";
-    if (els.charLabel) {
-      els.charLabel.style.display = "block";
-      els.charLabel.textContent = "📖 Using browser voice (MP3 generation unavailable)";
-    }
-
-    // Split into chunks to avoid Chrome 15s bug
-    const sentences = script.match(/[^.!?…]+[.!?…]+["']?\s*/g) || [script];
-    const chunks = [];
-    let buf = "";
-    for (const s of sentences) {
-      if ((buf + s).length > 200 && buf.trim()) { chunks.push(buf.trim()); buf = s; }
-      else buf += s;
-    }
-    if (buf.trim()) chunks.push(buf.trim());
-
-    let chunkIdx = 0;
-    let speaking = false;
-
-    function speakNext() {
-      if (chunkIdx >= chunks.length) {
-        speaking = false;
-        if (els.playBtn) els.playBtn.textContent = "▶";
-        if (els.charLabel) els.charLabel.textContent = "✅ Done";
-        return;
-      }
-      const utt = new SpeechSynthesisUtterance(chunks[chunkIdx]);
-      utt.rate = 1.0;
-      utt.onend = () => { chunkIdx++; if (speaking) speakNext(); };
-      utt.onerror = () => { chunkIdx++; if (speaking) speakNext(); };
-      window.speechSynthesis.speak(utt);
-    }
-
-    if (els.playBtn) {
-      els.playBtn.onclick = () => {
-        if (speaking) {
-          window.speechSynthesis.cancel();
-          speaking = false;
-          els.playBtn.textContent = "▶";
-        } else {
-          speaking = true;
-          els.playBtn.textContent = "⏸";
-          speakNext();
-        }
-      };
+    // Restart current chunk at new speed (cancel & re-speak)
+    if (isPlaying && !isPaused) {
+      window.speechSynthesis.cancel();
+      speakChunk(currentIdx);
     }
   }
 
-  // ── Helpers ────────────────────────────────
-  function formatTime(sec) {
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
+  // ── Progress bar ───────────────────────────
+  function updateProgress(idx) {
+    if (!els.progressBar || !sentences.length) return;
+    const pct = Math.round((idx / sentences.length) * 100);
+    els.progressBar.style.width = `${pct}%`;
   }
 
   return { init, show, hide, stop };

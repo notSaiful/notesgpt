@@ -639,17 +639,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ── Auth state listener — sync history on login ──
+  // ── Auth state listener — sync history on login / wipe on logout ──
   if (typeof Auth !== "undefined") {
     Auth.onAuthChange(async (user) => {
       if (user) {
-        // User just logged in — sync from cloud
+        // User just logged in — sync from cloud into user-scoped localStorage
         await History.syncFromCloud();
         renderDashboard();
-        console.log(`✅ Signed in as ${user.displayName || user.email}`);
+        console.log(`✅ Signed in as ${user.email || user.user_metadata?.full_name || "user"}`);
       } else {
-        // User logged out — re-render with local data only
+        // User logged out — wipe their local data, show guest dashboard
+        if (typeof History !== "undefined") History.wipeLocal();
         renderDashboard();
+        console.log("👋 Signed out — local history cleared");
       }
     });
   }

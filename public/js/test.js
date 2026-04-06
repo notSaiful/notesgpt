@@ -199,30 +199,22 @@ const TestEngine = (() => {
     els.accuracy.style.color = color;
     els.accuracyBar.style.background = `linear-gradient(90deg, ${color}, ${color})`;
 
-    // Per-question breakdown — show student's answer AND correct answer
+    // Per-question breakdown
     els.breakdown.innerHTML = results.map((r, i) => {
       const q = questions[i];
-      const studentAns = (userAnswers[i] || "").trim();
       const typeLabels = { mcq: "MCQ", short: "Short", long: "Long" };
       const isGood = r.marks_awarded >= r.total_marks * 0.7;
       const isPoor = r.marks_awarded < r.total_marks * 0.4;
       const statusClass = isGood ? "good" : isPoor ? "poor" : "partial";
-      const statusIcon = isGood ? "✅" : isPoor ? "❌" : "⚠️";
 
       return `
         <div class="test-result-card test-result-card--${statusClass}">
           <div class="test-result-card__header">
-            <span class="test-result-card__num">${statusIcon} Q${i + 1}</span>
+            <span class="test-result-card__num">Q${i + 1}</span>
             <span class="test-result-card__type">${typeLabels[q.type] || "Q"}</span>
             <span class="test-result-card__score">${r.marks_awarded}/${r.total_marks}</span>
           </div>
-          <p class="test-result-card__q"><strong>Question:</strong> ${q.question}</p>
-          <p class="test-result-card__student-ans" style="margin:6px 0;padding:8px 12px;background:rgba(255,255,255,0.05);border-radius:8px;border-left:3px solid ${isGood ? 'var(--success)' : isPoor ? 'var(--error)' : 'var(--warning)'}">
-            <strong>Your Answer:</strong> ${studentAns || "<em>(No answer provided)</em>"}
-          </p>
-          <p class="test-result-card__correct-ans" style="margin:6px 0;padding:8px 12px;background:rgba(76,175,80,0.08);border-radius:8px;border-left:3px solid var(--success)">
-            <strong>✅ Correct Answer:</strong> ${q.answer}
-          </p>
+          <p class="test-result-card__q">${q.question.slice(0, 100)}${q.question.length > 100 ? "…" : ""}</p>
           <p class="test-result-card__feedback">${r.feedback}</p>
           ${r.improvement_tip ? `<p class="test-result-card__tip">💡 ${r.improvement_tip}</p>` : ""}
         </div>

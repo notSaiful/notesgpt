@@ -5,7 +5,6 @@ const fs = require("fs");
 const { pipeline } = require("stream/promises");
 const { Readable } = require("stream");
 const { createClient } = require("@supabase/supabase-js");
-const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
 
 // ── Supabase Init ────────────────────────────────────────────
 let supabase = null;
@@ -753,40 +752,32 @@ Key Points: ${(q.key_points || []).join(", ")}
 Student's Answer: ${item.userAnswer}`;
     }).join("\n\n---\n\n");
 
-    const systemMsg = "You are a strict CBSE exam evaluator. Compare the student's answer against the correct answer. Grade HONESTLY and ACCURATELY. If the answer is factually wrong, give 0 marks. Output ONLY a valid JSON array.";
-    const prompt = `You are evaluating a CBSE Class ${classNum || "10"} student's test. For EACH question below:
+    const systemMsg = "You are a strict CBSE exam evaluator. Grade answers HONESTLY. If an answer is wrong, incomplete, or off-topic, give 0 or low marks. Do NOT be generous. Output ONLY a valid JSON array, no other text.";
+    const prompt = `Evaluate a CBSE Class ${classNum || "10"} student's test answers STRICTLY.
 
-1. Compare the student's answer CAREFULLY against the correct answer
-2. Check if the student's answer is FACTUALLY CORRECT (not just keyword matching)
-3. Check if ALL key points from the correct answer are covered
-4. Check for any WRONG statements in the student's answer (these should lose marks)
+Here are the questions, correct answers, and student's answers:
 
 ${qaText}
 
-STRICT GRADING RULES:
-- WRONG answer (factually incorrect, opposite meaning, or completely off-topic) → 0 marks
-- Partially correct (some right points, some missing) → proportional marks
-- Correct but incomplete (right idea, missing key details) → 50-70% marks
-- Fully correct with all key points → full marks
-- MCQ: ONLY full marks if the exact correct option is chosen, else 0
-- If student writes something FACTUALLY WRONG (not just incomplete), deduct extra marks
+STRICT RULES:
+- If student's answer is WRONG or completely off-topic: give 0 marks
+- If answer is partially correct: give proportional partial marks
+- If answer is correct but incomplete: deduct marks for missing key points
+- NEVER give full marks unless ALL key points are covered
+- Be FAIR but STRICT, like a real CBSE examiner
 
-For EACH question, provide SPECIFIC feedback:
-- State clearly what was CORRECT in the student's answer
-- State clearly what was WRONG or MISSING
-- Do NOT give generic feedback like "Good answer" — be specific
+Format strictly as a JSON array (no other text, no markdown, just the JSON):
 
-Format as JSON array (no other text):
 [
   {
     "marks_awarded": 0,
     "total_marks": 3,
-    "feedback": "Your definition of photosynthesis was correct, but you missed mentioning chlorophyll and sunlight as requirements.",
-    "improvement_tip": "Remember: Photosynthesis requires sunlight, CO2, water, and chlorophyll."
+    "feedback": "Brief feedback on what was right/wrong",
+    "improvement_tip": "Specific tip to improve"
   }
 ]
 
-Be honest and fair. Wrong = 0. Partial = partial. Correct = full.`;
+Be honest. Wrong answers = 0 marks. Partial = partial marks.`;
 
     const raw = await callOpenRouter(apiKey, systemMsg, prompt, 3000);
 
@@ -1297,7 +1288,7 @@ Format strictly as a JSON object (no markdown, no extra text):
   }
 });
 
-// ── API route: generate audiobook (AI script → Edge Neural TTS MP3) ─
+// ── API route: generate audiobook (AI script + Bytez bark TTS) ─
 app.post("/api/generate-audio-script", async (req, res) => {
   try {
     const { classNum, subject, chapter, summaryText } = req.body;
@@ -1309,9 +1300,7 @@ app.post("/api/generate-audio-script", async (req, res) => {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
 
-    // ── Step 1: Generate a clean narration script via AI ──
-    console.log(`🎧 Step 1: Generating narration script for "${chapter}"...`);
-
+    // ── Generate a clean, natural narration script via AI ──
     const systemMsg = "You are a friendly, engaging CBSE teacher narrating a lesson. Output ONLY the spoken script — plain conversational sentences. No markdown, no bullet points, no headings, no special characters.";
     const prompt = `Convert the following study notes into a natural spoken narration script for a Class ${classNum || 10} ${subject || "Science"} student.
 
@@ -1331,7 +1320,6 @@ ${summaryText.slice(0, 4000)}
 
 Output ONLY the spoken script. Nothing else.`;
 
-    let script = "";
     const raw = await callOpenRouter(apiKey, systemMsg, prompt, 2000);
 
     // Clean any residual markdown
@@ -1342,72 +1330,22 @@ Output ONLY the spoken script. Nothing else.`;
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
-    if (raw) {
-      script = cleanScript(raw);
-    } else {
-      script = cleanScript(summaryText).slice(0, 3000);
+    if (!raw) {
+      // Fallback: clean up the notes text itself for TTS
+      const fallback = cleanScript(summaryText);
+      return res.json({ script: fallback, wordCount: fallback.split(/\s+/).length, type: "text-only" });
     }
 
+    const script = cleanScript(raw);
     const wordCount = script.split(/\s+/).length;
-    console.log(`🎧 Step 2: Script ready (~${wordCount} words). Generating MP3 via Edge Neural TTS...`);
+    console.log(`🎧 Audiobook script ready: ~${wordCount} words`);
 
-    // ── Step 2: Convert script to MP3 via Microsoft Edge Neural TTS ──
-    const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const audioDir = path.join(AUDIO_DIR, sessionId);
-    fs.mkdirSync(audioDir, { recursive: true });
-
-    try {
-      const tts = new MsEdgeTTS();
-      await tts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
-      const result = await tts.toFile(audioDir, script);
-
-      if (!result || !result.audioFilePath) {
-        throw new Error("TTS returned no audio file");
-      }
-
-      // Move the generated file to a clean name
-      const finalName = `audiobook_${sessionId}.mp3`;
-      const finalPath = path.join(AUDIO_DIR, finalName);
-      fs.renameSync(result.audioFilePath, finalPath);
-
-      // Clean up the temp directory
-      try { fs.rmdirSync(audioDir); } catch {}
-
-      const stats = fs.statSync(finalPath);
-      const sizeMB = (stats.size / (1024 * 1024)).toFixed(1);
-      console.log(`✅ Audiobook MP3 generated: ${finalName} (${sizeMB}MB, ~${wordCount} words)`);
-
-      // Clean up old audiobook files (keep last 30)
-      try {
-        const allFiles = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("audiobook_") && f.endsWith(".mp3"));
-        if (allFiles.length > 30) {
-          const sorted = allFiles.sort();
-          const toDelete = sorted.slice(0, sorted.length - 30);
-          toDelete.forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
-          console.log(`🧹 Cleaned up ${toDelete.length} old audiobook files`);
-        }
-      } catch {}
-
-      return res.json({
-        script,
-        wordCount,
-        estimatedMinutes: Math.ceil(wordCount / 140),
-        type: "mp3",
-        audioUrl: `/audio/${finalName}`,
-        downloadUrl: `/audio/${finalName}`,
-      });
-    } catch (ttsErr) {
-      console.warn(`⚠️ Edge TTS failed: ${ttsErr.message} — falling back to text-only`);
-      // Clean up temp dir
-      try { fs.rmdirSync(audioDir, { recursive: true }); } catch {}
-
-      return res.json({
-        script,
-        wordCount,
-        estimatedMinutes: Math.ceil(wordCount / 140),
-        type: "text-only",
-      });
-    }
+    return res.json({
+      script,
+      wordCount,
+      estimatedMinutes: Math.ceil(wordCount / 140),
+      type: "text-only",
+    });
   } catch (err) {
     console.error("Audiobook error:", err);
     return res.status(500).json({ error: "An unexpected error occurred." });

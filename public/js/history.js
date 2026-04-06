@@ -1,35 +1,40 @@
 // ══════════════════════════════════════════════
-// NotesGPT — Saved History System (v3 – Cloud Sync + Local Fallback)
+// NotesGPT — Saved History System (v4 – User-Scoped)
+// ── Rules:
+//   • Guest (not logged in) → NEVER save anything locally or to cloud
+//   • Logged-in user → save under user-specific localStorage keys
+//   • Keys are scoped per userId so accounts can't collide on same browser
+//   • On login: sync from cloud; on logout: wipe local state for that user
 // ══════════════════════════════════════════════
 
 const History = (() => {
-  const BASE_STORAGE_KEY = "notesgpt_history";
-  const BASE_CONTENT_KEY = "notesgpt_content";
   const MAX_ITEMS = 50;
 
-  // ── Get current user ID for scoping ────────
-  function _getUserId() {
+  // ── Derive storage keys scoped to current user ──
+  function _uid() {
     if (typeof Auth !== "undefined" && Auth.isLoggedIn()) {
       const user = Auth.getUser();
-      return user ? user.id : null;
+      return user?.id || user?.email || null;
     }
-    return null;
+    return null; // guest → no key → no saves
   }
 
   function _storageKey() {
-    const uid = _getUserId();
-    return uid ? `${BASE_STORAGE_KEY}_${uid}` : null;
+    const uid = _uid();
+    if (!uid) return null;
+    return `notesgpt_history_${uid}`;
   }
 
   function _contentKey() {
-    const uid = _getUserId();
-    return uid ? `${BASE_CONTENT_KEY}_${uid}` : null;
+    const uid = _uid();
+    if (!uid) return null;
+    return `notesgpt_content_${uid}`;
   }
 
-  // ── Get all history (local, user-scoped) ───
+  // ── Get all history for current user ───────
   function getAll() {
     const key = _storageKey();
-    if (!key) return []; // Guest — no history
+    if (!key) return []; // guest → always empty
     try {
       return JSON.parse(localStorage.getItem(key)) || [];
     } catch { return []; }
@@ -37,59 +42,55 @@ const History = (() => {
 
   // ── Get stored content for a chapter ───────
   function getContent(classNum, subject, chapter) {
-    const sKey = _contentKey();
-    if (!sKey) return null;
+    const key = _contentKey();
+    if (!key) return null;
     try {
-      const all = JSON.parse(localStorage.getItem(sKey)) || {};
-      const key = `${classNum}_${subject}_${chapter}`;
-      return all[key] || null;
+      const all = JSON.parse(localStorage.getItem(key)) || {};
+      return all[`${classNum}_${subject}_${chapter}`] || null;
     } catch { return null; }
   }
 
   // ── Save generated content for a chapter ───
+  // Only saves if user is logged in
   function saveContent(classNum, subject, chapter, type, data) {
-    const sKey = _contentKey();
-    if (!sKey) return; // Guest — don't save
+    const key = _contentKey();
+    if (!key) return; // silent no-op for guests
     try {
-      const all = JSON.parse(localStorage.getItem(sKey)) || {};
-      const key = `${classNum}_${subject}_${chapter}`;
-      if (!all[key]) all[key] = {};
-      all[key][type] = data;
-      all[key].lastUpdated = Date.now();
-      localStorage.setItem(sKey, JSON.stringify(all));
+      const all = JSON.parse(localStorage.getItem(key)) || {};
+      const k = `${classNum}_${subject}_${chapter}`;
+      if (!all[k]) all[k] = {};
+      all[k][type] = data;
+      all[k].lastUpdated = Date.now();
+      localStorage.setItem(key, JSON.stringify(all));
     } catch {}
   }
 
-  // ── Save a generation ──────────────────────
+  // ── Save a session entry ───────────────────
+  // Only saves if user is logged in
   function save(entry) {
     const key = _storageKey();
-    if (!key) return; // Guest — don't save
+    if (!key) return; // guest → do nothing
 
     const all = getAll();
-
     const existIdx = all.findIndex(
       h => h.classNum === entry.classNum &&
-           h.subject === entry.subject &&
-           h.chapter === entry.chapter
+           h.subject  === entry.subject  &&
+           h.chapter  === entry.chapter
     );
 
     const record = {
-      id: existIdx >= 0 ? all[existIdx].id : Date.now(),
+      id:       existIdx >= 0 ? all[existIdx].id : Date.now(),
       classNum: entry.classNum,
-      subject: entry.subject,
-      chapter: entry.chapter,
-      type: entry.type || "summary",
+      subject:  entry.subject,
+      chapter:  entry.chapter,
+      type:     entry.type || "summary",
       timestamp: Date.now(),
-      dateStr: new Date().toLocaleDateString("en-IN", {
-        day: "numeric", month: "short", year: "numeric"
-      }),
-      timeStr: new Date().toLocaleTimeString("en-IN", {
-        hour: "2-digit", minute: "2-digit"
-      }),
-      preview: (entry.preview || "").slice(0, 120),
-      testScore: entry.testScore || null,
-      accuracy: entry.accuracy || null,
-      arenaScore: entry.arenaScore || null,
+      dateStr: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+      timeStr: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      preview:     (entry.preview || "").slice(0, 120),
+      testScore:   entry.testScore   || null,
+      accuracy:    entry.accuracy    || null,
+      arenaScore:  entry.arenaScore  || null,
       arenaStreak: entry.arenaStreak || null,
     };
 
@@ -100,10 +101,9 @@ const History = (() => {
     }
 
     if (all.length > MAX_ITEMS) all.length = MAX_ITEMS;
-
     try { localStorage.setItem(key, JSON.stringify(all)); } catch {}
 
-    // Cloud sync: save to server if logged in
+    // Cloud sync
     _cloudSave(entry);
   }
 
@@ -115,7 +115,7 @@ const History = (() => {
     try { localStorage.setItem(key, JSON.stringify(all)); } catch {}
   }
 
-  // ── Clear all ──────────────────────────────
+  // ── Clear all (for current user only) ──────
   function clearAll() {
     const sKey = _storageKey();
     const cKey = _contentKey();
@@ -123,12 +123,29 @@ const History = (() => {
       if (sKey) localStorage.removeItem(sKey);
       if (cKey) localStorage.removeItem(cKey);
     } catch {}
-    // Cloud sync: clear on server
     _cloudClear();
   }
 
+  // ── Wipe local state when user logs out ────
+  // Called from app.js on auth change to null
+  function wipeLocal() {
+    // We can't use _uid() here since user is already logged out.
+    // Instead, scan localStorage for any notesgpt_ keys and remove them.
+    // This is safe — a fresh login will re-sync from cloud.
+    try {
+      const toRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("notesgpt_history_") || k.startsWith("notesgpt_content_"))) {
+          toRemove.push(k);
+        }
+      }
+      toRemove.forEach(k => localStorage.removeItem(k));
+    } catch {}
+  }
+
   // ═══════════════════════════════════════════
-  // CLOUD SYNC (Firebase/Firestore via API)
+  // CLOUD SYNC
   // ═══════════════════════════════════════════
 
   async function _getAuthToken() {
@@ -150,13 +167,13 @@ const History = (() => {
         },
         body: JSON.stringify({
           classNum: entry.classNum,
-          subject: entry.subject,
-          chapter: entry.chapter,
-          topic: entry.topic || "",
-          step: entry.type || "summary",
-          data: { 
-            preview: (entry.preview || "").slice(0, 200),
-            arenaScore: entry.arenaScore || null,
+          subject:  entry.subject,
+          chapter:  entry.chapter,
+          topic:    entry.topic || "",
+          step:     entry.type  || "summary",
+          data: {
+            preview:     (entry.preview || "").slice(0, 200),
+            arenaScore:  entry.arenaScore  || null,
             arenaStreak: entry.arenaStreak || null,
           },
         }),
@@ -179,10 +196,12 @@ const History = (() => {
     }
   }
 
-  // Fetch history from cloud and merge with local
+  // Fetch history from cloud and merge into user-scoped localStorage
   async function syncFromCloud() {
     const token = await _getAuthToken();
-    if (!token) return;
+    const key = _storageKey();
+    if (!token || !key) return; // guest → skip sync
+
     try {
       const res = await fetch("/api/history", {
         headers: { Authorization: `Bearer ${token}` },
@@ -191,37 +210,37 @@ const History = (() => {
       if (data.history && data.history.length > 0) {
         const local = getAll();
         const merged = [...local];
-        // Add cloud entries not already in local
+
         for (const cloud of data.history) {
-          const cloudClass = cloud.class_num || cloud.classNum;
+          const cloudClass   = cloud.class_num || cloud.classNum;
           const cloudSubject = cloud.subject;
           const cloudChapter = cloud.chapter;
           const exists = merged.some(
             l => l.classNum === cloudClass &&
-                 l.subject === cloudSubject &&
-                 l.chapter === cloudChapter
+                 l.subject  === cloudSubject &&
+                 l.chapter  === cloudChapter
           );
           if (!exists) {
             const ts = cloud.created_at ? new Date(cloud.created_at).getTime() : Date.now();
             merged.push({
-              id: Date.now() + Math.random(),
-              classNum: cloud.class_num || cloud.classNum,
-              subject: cloud.subject,
-              chapter: cloud.chapter,
-              type: "summary",
+              id:        Date.now() + Math.random(),
+              classNum:  cloudClass,
+              subject:   cloudSubject,
+              chapter:   cloudChapter,
+              type:      "summary",
               timestamp: ts,
               dateStr: new Date(ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
               timeStr: new Date(ts).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-              preview: "",
-              testScore: null,
-              accuracy: null,
+              preview:    "",
+              testScore:  null,
+              accuracy:   null,
             });
           }
         }
-        // Sort by timestamp descending
+
         merged.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         if (merged.length > MAX_ITEMS) merged.length = MAX_ITEMS;
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch {}
+        try { localStorage.setItem(key, JSON.stringify(merged)); } catch {}
       }
     } catch (err) {
       console.warn("Cloud sync failed:", err.message);
@@ -229,9 +248,22 @@ const History = (() => {
   }
 
   // ── Render history list ────────────────────
+  // Shows a "sign in to save your progress" message for guests
   function render(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
+
+    // Guest: show sign-in prompt
+    if (!_uid()) {
+      container.innerHTML = `
+        <div class="hist-guest-prompt">
+          <p class="hist-empty">🔒 <strong>Sign in to save your study progress</strong></p>
+          <p class="hist-empty" style="font-size:0.8rem;margin-top:4px;opacity:0.7;">Your study history, test scores, and chapter progress will be saved to your account.</p>
+          <button class="btn btn--primary btn--sm" style="margin-top:12px;" onclick="Auth.showModal()">Sign In / Sign Up</button>
+        </div>
+      `;
+      return;
+    }
 
     const all = getAll();
 
@@ -242,15 +274,14 @@ const History = (() => {
 
     container.innerHTML = all.map(h => {
       const typeIcon = {
-        summary: "\ud83d\udcdd", flashcards: "\ud83d\udd12", practice: "\ud83d\udccb",
-        test: "\ud83d\udcdd", correction: "\ud83d\udd27", arena: "\u2694\ufe0f"
-      }[h.type] || "\ud83d\udcdd";
+        summary: "📝", flashcards: "🔑", practice: "📋",
+        test: "📝", correction: "🔧", arena: "⚔️"
+      }[h.type] || "📝";
 
       const scoreHtml = h.testScore !== null
         ? `<span class="hist-card__score">${h.testScore}%</span>`
         : (h.arenaScore !== null ? `<span class="hist-card__score hist-card__score--arena">${h.arenaScore} pts</span>` : "");
 
-      // Check if content is available for review
       const content = getContent(h.classNum, h.subject, h.chapter);
       const hasContent = content && (content.summary || content.flashcards || content.testResults);
 
@@ -258,14 +289,17 @@ const History = (() => {
         <div class="hist-card" data-id="${h.id}">
           <div class="hist-card__icon">${typeIcon}</div>
           <div class="hist-card__info">
-            <div class="hist-card__title">Class ${h.classNum} \u00b7 ${h.subject}</div>
+            <div class="hist-card__title">Class ${h.classNum} · ${h.subject}</div>
             <div class="hist-card__chapter">${h.chapter}</div>
-            <div class="hist-card__meta">${h.dateStr} \u00b7 ${h.timeStr}</div>
+            <div class="hist-card__meta">${h.dateStr} · ${h.timeStr}</div>
           </div>
           ${scoreHtml}
           <div class="hist-card__buttons">
-            ${hasContent ? `<button class="hist-card__resume" onclick="History.resume(${h.id})">\ud83d\udcd6 Resume</button>` : `<button class="hist-card__resume" onclick="History.regenerate(${h.id})">\ud83d\udd04 Regenerate</button>`}
-            <button class="hist-card__revise" onclick="History.revise(${h.id})">\ud83d\udd04 Revise</button>
+            ${hasContent
+              ? `<button class="hist-card__resume" onclick="History.resume(${h.id})">📖 Resume</button>`
+              : `<button class="hist-card__resume" onclick="History.regenerate(${h.id})">🔄 Regenerate</button>`
+            }
+            <button class="hist-card__revise" onclick="History.revise(${h.id})">🔄 Revise</button>
           </div>
         </div>
       `;
@@ -279,40 +313,31 @@ const History = (() => {
     if (!entry) return;
 
     const content = getContent(entry.classNum, entry.subject, entry.chapter);
-    if (!content) {
-      regenerate(id);
-      return;
-    }
+    if (!content) { regenerate(id); return; }
 
-    // Set current session
     window.currentClassNum = entry.classNum;
-    window.currentSubject = entry.subject;
-    window.currentChapter = entry.chapter;
+    window.currentSubject  = entry.subject;
+    window.currentChapter  = entry.chapter;
 
-    // Build review HTML
     const reviewContent = document.getElementById("review-content");
-    const reviewTitle = document.getElementById("review-title");
+    const reviewTitle   = document.getElementById("review-title");
     if (!reviewContent || !reviewTitle) return;
 
-    reviewTitle.textContent = `\ud83d\udcd6 ${entry.subject} \u2014 ${entry.chapter} (Class ${entry.classNum})`;
+    reviewTitle.textContent = `📖 ${entry.subject} — ${entry.chapter} (Class ${entry.classNum})`;
 
     let html = "";
-
-    // Summary
     if (content.summary) {
       html += `
         <div class="review-block">
-          <h3 class="review-block__title">\ud83d\udcdd Summary Notes</h3>
+          <h3 class="review-block__title">📝 Summary Notes</h3>
           <div class="review-block__body notes-content">${content.summary}</div>
         </div>
       `;
     }
-
-    // Flashcards
     if (content.flashcards && content.flashcards.length > 0) {
       html += `
         <div class="review-block">
-          <h3 class="review-block__title">\ud83d\udd12 Flashcards (${content.flashcards.length} cards)</h3>
+          <h3 class="review-block__title">🔑 Flashcards (${content.flashcards.length} cards)</h3>
           <div class="review-block__body review-fc-list">
             ${content.flashcards.map((fc, i) => `
               <div class="review-fc">
@@ -324,13 +349,11 @@ const History = (() => {
         </div>
       `;
     }
-
-    // Test Results
     if (content.testResults) {
       const tr = content.testResults;
       html += `
         <div class="review-block">
-          <h3 class="review-block__title">\ud83d\udcca Test Results</h3>
+          <h3 class="review-block__title">📊 Test Results</h3>
           <div class="review-block__body">
             <p><strong>Score:</strong> ${tr.score || "N/A"} / ${tr.total || "N/A"} (${tr.accuracy || "N/A"}%)</p>
             ${tr.weakAreas ? `<p><strong>Weak Areas:</strong> ${tr.weakAreas}</p>` : ""}
@@ -338,26 +361,9 @@ const History = (() => {
         </div>
       `;
     }
-
-    // Mind Map
-    if (content.mindmap) {
-      html += `
-        <div class="review-block">
-          <h3 class="review-block__title">\ud83d\uddfa\ufe0f Mind Map Data</h3>
-          <div class="review-block__body">
-            <p>Mind map was generated for this chapter.</p>
-          </div>
-        </div>
-      `;
-    }
-
-    if (!html) {
-      html = '<p class="hist-empty">No stored content found. Try regenerating.</p>';
-    }
+    if (!html) html = '<p class="hist-empty">No stored content found. Try regenerating.</p>';
 
     reviewContent.innerHTML = html;
-
-    // Show review section
     if (typeof setGlobalView === "function") setGlobalView("review");
   }
 
@@ -368,23 +374,19 @@ const History = (() => {
     if (!entry) return;
 
     window.currentClassNum = entry.classNum;
-    window.currentSubject = entry.subject;
-    window.currentChapter = entry.chapter;
+    window.currentSubject  = entry.subject;
+    window.currentChapter  = entry.chapter;
 
-    const classSelect = document.getElementById("class-select");
-    const subjectSelect = document.getElementById("subject-select");
+    const classSelect   = document.getElementById("class-select");
     const chapterSelect = document.getElementById("chapter-select");
-
-    if (classSelect) classSelect.value = entry.classNum;
+    if (classSelect)   classSelect.value   = entry.classNum;
     if (chapterSelect) chapterSelect.value = entry.chapter;
 
     const form = document.getElementById("notes-form");
-    if (form) {
-      form.dispatchEvent(new Event("submit", { cancelable: true }));
-    }
+    if (form) form.dispatchEvent(new Event("submit", { cancelable: true }));
   }
 
-  // ── Revise (re-read notes or launch revision tools) ─
+  // ── Revise (restore notes or regenerate) ───
   function revise(id) {
     const all = getAll();
     const entry = all.find(h => h.id === id);
@@ -394,26 +396,25 @@ const History = (() => {
     window.currentSubject  = entry.subject;
     window.currentChapter  = entry.chapter;
 
-    // Check if we have stored summary content to show
     const content = getContent(entry.classNum, entry.subject, entry.chapter);
-
     if (content && content.summary) {
-      // Restore the notes into the output section
-      const notesEl = document.getElementById("notes-content");
+      const notesEl    = document.getElementById("notes-content");
       const outputTitle = document.getElementById("output-title");
       const outputBadge = document.getElementById("output-badge");
-
-      if (notesEl) notesEl.innerHTML = content.summary;
+      if (notesEl)     notesEl.innerHTML    = content.summary;
       if (outputTitle) outputTitle.textContent = entry.chapter;
       if (outputBadge) outputBadge.textContent = `Class ${entry.classNum} · ${entry.subject}`;
-
       if (typeof setGlobalView === "function") setGlobalView("output");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      // No stored content — regenerate the notes
       regenerate(id);
     }
   }
 
-  return { getAll, save, saveContent, getContent, remove, clearAll, render, resume, regenerate, revise, syncFromCloud };
+  return {
+    getAll, save, saveContent, getContent,
+    remove, clearAll, wipeLocal,
+    render, resume, regenerate, revise,
+    syncFromCloud,
+  };
 })();
