@@ -116,6 +116,11 @@ const MusicPlayer = (() => {
       els.player.classList.remove("hidden");
       els.playBtn.textContent = "▶";
 
+      // ― HubSpot: Track memory song generation ―
+      if (typeof HubTrack !== "undefined") {
+        HubTrack.memorySongGenerated(window.currentClassNum, window.currentSubject, window.currentChapter);
+      }
+
     } catch (err) {
       els.loading.classList.add("hidden");
       els.error.classList.remove("hidden");

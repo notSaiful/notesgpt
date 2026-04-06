@@ -405,6 +405,12 @@ DOM.form.addEventListener("submit", async (e) => {
     }
 
     setGlobalView("output");
+
+    // ― HubSpot: Track notes generation ―
+    if (typeof HubTrack !== "undefined") {
+      const wordCount = data.notes ? data.notes.split(/\s+/).length : 0;
+      HubTrack.notesGenerated(classNum, subject, chapter, wordCount);
+    }
   } catch (err) {
     setGlobalView("form");
     showError(err.message);

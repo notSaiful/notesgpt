@@ -242,6 +242,17 @@ const TestEngine = (() => {
     setGlobalView("test-results");
     window.scrollTo({ top: 0, behavior: "smooth" });
 
+    // ― HubSpot: Track test submission ―
+    if (typeof HubTrack !== "undefined") {
+      HubTrack.testSubmitted(
+        sessionClass,
+        sessionSubject,
+        sessionChapter,
+        awarded,
+        max
+      );
+    }
+
     // Save to tracker
     if (typeof Tracker !== "undefined") {
       Tracker.saveTest(sessionClass, sessionSubject, sessionChapter, awarded, max, results);

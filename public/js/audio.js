@@ -131,6 +131,10 @@ const AudioPlayer = (() => {
         sentences = splitIntoChunks(data.script);
         currentIdx = 0;
         showPlayer(data.estimatedMinutes || 3, "🔊 Browser Voice");
+        // ― HubSpot: Track audiobook generation ―
+        if (typeof HubTrack !== "undefined") {
+          HubTrack.audiobookGenerated(window.currentClassNum, window.currentSubject, window.currentChapter);
+        }
         setTimeout(() => startBrowserTTS(), 300);
       } else {
         throw new Error("No audio data received.");

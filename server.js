@@ -5,6 +5,7 @@ const fs = require("fs");
 const { pipeline } = require("stream/promises");
 const { Readable } = require("stream");
 const { createClient } = require("@supabase/supabase-js");
+const HubSpot = require("./hubspot");
 
 // ── Supabase Init ────────────────────────────────────────────
 let supabase = null;
@@ -2017,7 +2018,41 @@ app.delete("/api/history/:id", verifyAuth, async (req, res) => {
   }
 });
 
+// ── HubSpot CRM Tracking Endpoint ───────────────────────────
+// Frontend calls this after every major study event.
+// Works for both logged-in users and anonymous landing page visitors.
+app.post("/api/hubspot/track", async (req, res) => {
+  // Fire-and-forget — never block the user experience
+  res.json({ ok: true });
+
+  try {
+    const { email, eventType, data } = req.body;
+    if (!email || !eventType) return;
+
+    if (eventType === "signup") {
+      await HubSpot.onStudentSignup({ email, user_metadata: data || {} });
+    } else if (eventType === "landing_cta_clicked") {
+      await HubSpot.upsertContact(email, {
+        lead_source: "Landing Page CTA",
+        lifecyclestage: "lead",
+        notesgpt_engagement_tier: "new",
+      });
+      await HubSpot.logStudyEvent(email, "landing_cta_clicked", data || {});
+    } else {
+      await HubSpot.onStudyEvent(email, eventType, data || {});
+    }
+  } catch (err) {
+    console.warn("⚠️ HubSpot track error (non-fatal):", err.message);
+  }
+});
+
 // ── Start server ─────────────────────────────────────────────
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 NotesGPT server running at http://localhost:${PORT}`);
+
+  if (process.env.HUBSPOT_API_KEY) {
+    console.log("🤝 HubSpot CRM integration: ACTIVE");
+  } else {
+    console.warn("⚠️  HubSpot CRM: HUBSPOT_API_KEY not set — add it to .env to activate CRM sync");
+  }
 });

@@ -29,6 +29,19 @@ const Auth = (() => {
         currentUser = session?.user || null;
         _updateUI(currentUser);
         onAuthChangeCallbacks.forEach((cb) => cb(currentUser));
+
+        // ― HubSpot: Keep email in sync globally ―
+        window.currentUserEmail = currentUser?.email || null;
+
+        // Fire signup event on first login
+        if ((event === "SIGNED_IN") && currentUser?.email) {
+          if (typeof HubTrack !== "undefined") {
+            HubTrack.onSignup(currentUser.email, {
+              full_name: currentUser.user_metadata?.full_name || "",
+              provider: currentUser.app_metadata?.provider || "email",
+            });
+          }
+        }
       });
 
       // Check initial session
@@ -37,6 +50,9 @@ const Auth = (() => {
       currentUser = session?.user || null;
       _updateUI(currentUser);
       onAuthChangeCallbacks.forEach((cb) => cb(currentUser));
+
+      // ― HubSpot: Set email on page load for returning users ―
+      window.currentUserEmail = currentUser?.email || null;
 
       console.log("🔐 Supabase Auth initialized");
     } catch (err) {

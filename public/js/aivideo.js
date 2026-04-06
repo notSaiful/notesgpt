@@ -82,6 +82,10 @@ const AIVideo = (() => {
       if (data.type === "slideshow" && data.slides && data.slides.length > 0) {
         slides = data.slides;
         showPlayer();
+        // ― HubSpot: Track visual lesson ―
+        if (typeof HubTrack !== "undefined") {
+          HubTrack.visualLessonGenerated(window.currentClassNum, window.currentSubject, window.currentChapter, slides.length);
+        }
       } else {
         throw new Error("No slides generated.");
       }
