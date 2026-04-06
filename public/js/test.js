@@ -261,6 +261,13 @@ const TestEngine = (() => {
     if (typeof Tracker !== "undefined") {
       Tracker.saveTest(sessionClass, sessionSubject, sessionChapter, awarded, max, results);
     }
+    // ― Share: Inject share bar on test results ―
+    const scorePct = Math.round((awarded / max) * 100);
+    if (typeof ShareManager !== "undefined") {
+      setTimeout(() => ShareManager.injectShareBar(
+        "test-results-section", "test", sessionClass, sessionSubject, sessionChapter, scorePct
+      ), 600);
+    }
   }
 
   return { init, start, getState: () => ({ questions, results, userAnswers, sessionClass, sessionSubject, sessionChapter }) };

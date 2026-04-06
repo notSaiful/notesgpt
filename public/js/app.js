@@ -416,6 +416,19 @@ DOM.form.addEventListener("submit", async (e) => {
       const wordCount = data.notes ? data.notes.split(/\s+/).length : 0;
       HubTrack.notesGenerated(classNum, subject, chapter, wordCount);
     }
+    // ― Share bar: Inject WhatsApp share below notes ―
+    if (typeof ShareManager !== "undefined") {
+      setTimeout(() => ShareManager.injectShareBar("output-section", "notes", classNum, subject, chapter), 500);
+    }
+    // ― Push: Schedule study reminder + ask permission ―
+    if (typeof PushManager !== "undefined") {
+      PushManager.scheduleReminders(classNum, subject, chapter);
+      setTimeout(() => PushManager.maybeAskPermission(), 8000);
+    }
+    // Expose chapter context globally for other modules
+    window.currentClassNum = classNum;
+    window.currentSubject = subject;
+    window.currentChapter = chapter;
   } catch (err) {
     setGlobalView("form");
     showError(err.message);
