@@ -4948,23 +4948,42 @@ a, button, input, select, textarea {
   25%, 100% { opacity: 0; transform: translateY(-16px); z-index: 1; }
 }
 
-/* Mobile: keep card animation running, just simplify layout */
+/* Mobile: keep card animation, expand to fit screen */
 @media (max-width: 768px) {
-  .lp-hero__body {
-    height: auto;
-    min-height: 280px;
+  .lp-hero__right {
+    width: 100%;
+    perspective: none;
+  }
+  .hero-mockup {
+    max-width: 100%;
+    transform: none;
+    border-radius: 14px;
+  }
+  .hero-mockup:hover {
+    transform: none;
+  }
+  .hero-mockup__body {
+    height: 320px;
+    padding: 16px;
+  }
+  .mockup-screens {
     position: relative;
+    width: 100%;
+    height: 100%;
   }
   .mockup-screen {
     animation: hero-sequence 10s infinite;
     position: absolute;
     inset: 0;
+    padding: 16px;
+    border-radius: 10px;
   }
   .mockup-screen--1 { animation-delay: 0s; }
   .mockup-screen--2 { animation-delay: 2.5s; }
   .mockup-screen--3 { animation-delay: 5.0s; }
   .mockup-screen--4 { animation-delay: 7.5s; }
 }
+
 
 
 /* ── Common Mockup Elements ── */
@@ -5124,8 +5143,8 @@ a, button, input, select, textarea {
   .lp-hero__left { margin-bottom: 40px; }
   .lp-hero__title { font-size: 2.5rem; }
   .lp-hero__sub { font-size: 1.1rem; }
-  .hero-mockup { max-width: 400px; }
-  .hero-mockup__body { height: 400px; }
+  .hero-mockup { max-width: 100%; transform: none; }
+  .hero-mockup__body { height: 320px; }
 }
 .lp-hero__title {
   font-size: 3.4rem;
