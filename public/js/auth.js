@@ -35,6 +35,9 @@ const Auth = (() => {
 
         // Fire signup event on first login
         if ((event === "SIGNED_IN") && currentUser?.email) {
+          if (typeof GA !== "undefined") {
+            GA.signIn(currentUser.app_metadata?.provider || "email");
+          }
           if (typeof HubTrack !== "undefined") {
             HubTrack.onSignup(currentUser.email, {
               full_name: currentUser.user_metadata?.full_name || "",

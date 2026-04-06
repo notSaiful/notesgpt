@@ -242,6 +242,10 @@ const TestEngine = (() => {
     setGlobalView("test-results");
     window.scrollTo({ top: 0, behavior: "smooth" });
 
+    // ― Analytics: Track test submission ―
+    if (typeof GA !== "undefined") {
+      GA.testSubmitted(sessionClass, sessionSubject, sessionChapter, awarded, max);
+    }
     // ― HubSpot: Track test submission ―
     if (typeof HubTrack !== "undefined") {
       HubTrack.testSubmitted(

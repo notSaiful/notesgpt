@@ -131,6 +131,8 @@ const AudioPlayer = (() => {
         sentences = splitIntoChunks(data.script);
         currentIdx = 0;
         showPlayer(data.estimatedMinutes || 3, "🔊 Browser Voice");
+        // ― Analytics ―
+        if (typeof GA !== "undefined") GA.audiobookGenerated(window.currentClassNum, window.currentSubject, window.currentChapter);
         // ― HubSpot: Track audiobook generation ―
         if (typeof HubTrack !== "undefined") {
           HubTrack.audiobookGenerated(window.currentClassNum, window.currentSubject, window.currentChapter);

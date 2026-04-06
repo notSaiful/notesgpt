@@ -82,6 +82,8 @@ const AIVideo = (() => {
       if (data.type === "slideshow" && data.slides && data.slides.length > 0) {
         slides = data.slides;
         showPlayer();
+        // ― Analytics ―
+        if (typeof GA !== "undefined") GA.visualLessonGenerated(window.currentClassNum, window.currentSubject, window.currentChapter, slides.length);
         // ― HubSpot: Track visual lesson ―
         if (typeof HubTrack !== "undefined") {
           HubTrack.visualLessonGenerated(window.currentClassNum, window.currentSubject, window.currentChapter, slides.length);

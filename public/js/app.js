@@ -406,6 +406,11 @@ DOM.form.addEventListener("submit", async (e) => {
 
     setGlobalView("output");
 
+    // ― Analytics: Track notes generation ―
+    if (typeof GA !== "undefined") {
+      const wordCount = data.notes ? data.notes.split(/\s+/).length : 0;
+      GA.notesGenerated(classNum, subject, chapter, wordCount);
+    }
     // ― HubSpot: Track notes generation ―
     if (typeof HubTrack !== "undefined") {
       const wordCount = data.notes ? data.notes.split(/\s+/).length : 0;

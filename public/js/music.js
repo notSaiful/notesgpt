@@ -116,6 +116,8 @@ const MusicPlayer = (() => {
       els.player.classList.remove("hidden");
       els.playBtn.textContent = "▶";
 
+      // ― Analytics ―
+      if (typeof GA !== "undefined") GA.memorySongGenerated(window.currentClassNum, window.currentSubject, window.currentChapter);
       // ― HubSpot: Track memory song generation ―
       if (typeof HubTrack !== "undefined") {
         HubTrack.memorySongGenerated(window.currentClassNum, window.currentSubject, window.currentChapter);
