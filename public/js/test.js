@@ -33,7 +33,7 @@ const TestEngine = (() => {
     els.accuracyBar = document.getElementById("test-accuracy-bar");
     els.breakdown = document.getElementById("test-breakdown");
     els.weakAreas = document.getElementById("test-weak-areas");
-    els.newNotesBtn = document.getElementById("test-new-notes-btn");
+
     els.retryBtn = document.getElementById("test-retry-btn");
   }
 
@@ -42,11 +42,7 @@ const TestEngine = (() => {
     cacheDom();
 
     if (els.nextBtn) els.nextBtn.addEventListener("click", nextQuestion);
-    if (els.newNotesBtn) {
-      els.newNotesBtn.addEventListener("click", () => {
-        if (typeof resetToForm === "function") resetToForm();
-      });
-    }
+
     if (els.retryBtn) {
       els.retryBtn.addEventListener("click", () => {
         setGlobalView("output");

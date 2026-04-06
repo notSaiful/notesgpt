@@ -32,7 +32,7 @@ const DOM = {
   outputBadge: document.getElementById("output-badge"),
   outputTitle: document.getElementById("output-title"),
   notesContent: document.getElementById("notes-content"),
-  newNotesBtn: document.getElementById("new-notes-btn"),
+
   flashcardBtn: document.getElementById("flashcard-btn"),
   flashcardLoading: document.getElementById("flashcard-loading"),
   flashcardSection: document.getElementById("flashcard-section"),
@@ -414,7 +414,7 @@ DOM.form.addEventListener("submit", async (e) => {
 });
 
 // ── Button handlers ──────────────────────────
-if (DOM.newNotesBtn) DOM.newNotesBtn.addEventListener("click", resetToForm);
+
 
 if (DOM.dashNewBtn) DOM.dashNewBtn.addEventListener("click", () => {
   setGlobalView("form");

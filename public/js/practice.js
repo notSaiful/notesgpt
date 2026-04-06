@@ -35,7 +35,7 @@ const Practice = (() => {
     els.marksTip = document.getElementById("pq-marks-tip");
     els.nextBtn = document.getElementById("pq-next-btn");
     els.practiceStats = document.getElementById("practice-stats");
-    els.newNotesBtn = document.getElementById("pq-new-notes-btn");
+
   }
 
   // ── Init ───────────────────────────────────
@@ -49,9 +49,7 @@ const Practice = (() => {
       showSolution();
     });
     if (els.nextBtn) els.nextBtn.addEventListener("click", nextQuestion);
-    if (els.newNotesBtn) els.newNotesBtn.addEventListener("click", () => {
-      if (typeof resetToForm === "function") resetToForm();
-    });
+
   }
 
   // ── Start practice ─────────────────────────

@@ -34,7 +34,7 @@ const Flashcards = (() => {
     els.ratePartial = document.getElementById("fc-rate-partial");
     els.rateYes = document.getElementById("fc-rate-yes");
     els.completeStats = document.getElementById("complete-stats");
-    els.newNotesBtn = document.getElementById("fc-new-notes-btn");
+
   }
 
   // ── Init ───────────────────────────────────
@@ -45,9 +45,7 @@ const Flashcards = (() => {
     if (els.rateNo) els.rateNo.addEventListener("click", () => rateCard("didnt"));
     if (els.ratePartial) els.ratePartial.addEventListener("click", () => rateCard("partial"));
     if (els.rateYes) els.rateYes.addEventListener("click", () => rateCard("knew"));
-    if (els.newNotesBtn) els.newNotesBtn.addEventListener("click", () => {
-      if (typeof resetToForm === "function") resetToForm();
-    });
+
   }
 
   // ── Start flashcards ──────────────────────
