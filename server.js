@@ -1703,12 +1703,11 @@ Output song lyrics only. Nothing else.`;
   }
 });
 
-// ── API route: generate AI video (Bytez — Multi-Clip) ────────
-// (fs, pipeline, Readable imported at top)
-
-// Ensure videos directory exists
-const VIDEOS_DIR = path.join(__dirname, "public", "videos");
-if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
+// ── API route: generate AI visual slideshow (Pollinations.ai — FREE) ────
+// Generates educational images + narration for each scene
+// Uses Pollinations.ai (Flux model) — completely free, no API key needed
+const IMAGES_DIR = path.join(__dirname, "public", "images", "slides");
+if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
 
 app.post("/api/generate-video", async (req, res) => {
   try {
@@ -1718,173 +1717,150 @@ app.post("/api/generate-video", async (req, res) => {
       return res.status(400).json({ error: "Chapter is required." });
     }
 
-    const bytezKey = process.env.BYTEZ_API_KEY;
-    if (!bytezKey) {
-      return res.status(500).json({ error: "Bytez API key not configured.", fallback: "youtube" });
-    }
-
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "OpenRouter API key not configured.", fallback: "youtube" });
     }
 
-    // ── Step 1: Generate scene descriptions using AI ──
-    console.log(`🎬 Step 1: Generating scene descriptions for "${chapter}"...`);
+    // ── Step 1: Generate scene descriptions + narration via AI ──
+    console.log(`🎬 Step 1: Generating visual scenes for "${chapter}"...`);
 
-    const sceneSystemMsg = "You are an educational video director. Generate short, visual scene descriptions for an AI video generator. Output ONLY a valid JSON array, no other text.";
-    const scenePrompt = `Create 4 short visual scene descriptions for an educational video about CBSE Class ${classNum || 10} ${subject || ""} chapter: "${chapter}".
+    const sceneSystemMsg = `You are an educational visual content director. Generate scene descriptions with narration for an illustrated visual lesson.
+Output ONLY a valid JSON array, no other text. Each element must have "image_prompt" and "narration" fields.`;
+
+    const scenePrompt = `Create 4 illustrated scenes for a visual lesson about CBSE Class ${classNum || 10} ${subject || ""} chapter: "${chapter}".
 
 Each scene should visually explain a KEY CONCEPT from the chapter.
 
-Rules:
-- Each scene description must be 1 sentence, max 15 words
-- Describe ONLY visual elements (what is shown on screen)
-- Use simple, concrete imagery (diagrams, objects, animations)
-- Avoid abstract concepts — make them visual
-- Focus on the most important exam concepts
-- Each scene should cover a DIFFERENT concept
+Rules for image_prompt:
+- Write a detailed, visual description for an AI image generator (Flux model)
+- Describe specific diagrams, objects, colors, labels, and layout
+- Use "educational illustration" or "textbook diagram" style
+- Include text labels in the image where helpful
+- Max 30 words per prompt
 
-Format as JSON array of strings:
-["Scene 1 description", "Scene 2 description", "Scene 3 description", "Scene 4 description"]`;
+Rules for narration:
+- Write 2-3 sentences explaining the concept shown in the image
+- Speak directly to the student ("Notice how...", "Here you can see...")
+- Include exam-relevant facts and tips
+- Keep each narration under 50 words
 
-    const sceneRaw = await callOpenRouter(apiKey, sceneSystemMsg, scenePrompt, 500);
-    
+Format as JSON array:
+[
+  {"image_prompt": "...", "narration": "..."},
+  {"image_prompt": "...", "narration": "..."},
+  {"image_prompt": "...", "narration": "..."},
+  {"image_prompt": "...", "narration": "..."}
+]`;
+
+    const sceneRaw = await callOpenRouter(apiKey, sceneSystemMsg, scenePrompt, 1200);
+
     let scenes = [];
     if (sceneRaw) {
       try {
         const parsed = JSON.parse(sceneRaw);
-        if (Array.isArray(parsed)) scenes = parsed.slice(0, 5).map(String);
+        if (Array.isArray(parsed)) scenes = parsed.slice(0, 5);
       } catch {
-        const arr = extractJsonArray(sceneRaw);
-        if (arr) scenes = arr.slice(0, 5).map(String);
+        // Try to extract JSON array from response
+        const match = sceneRaw.match(/\[[\s\S]*\]/);
+        if (match) {
+          try { scenes = JSON.parse(match[0]).slice(0, 5); } catch {}
+        }
       }
     }
+
+    // Validate scene structure
+    scenes = scenes.filter(s => s && s.image_prompt && s.narration);
 
     // Fallback scenes if AI fails
     if (scenes.length === 0) {
       scenes = [
-        `Educational diagram illustrating key concepts of ${chapter}`,
-        `Animated visualization of formulas and definitions for ${chapter}`,
-        `Colorful flowchart showing the process described in ${chapter}`,
-        `Summary infographic with important points from ${chapter}`,
+        { image_prompt: `Educational diagram illustrating key concepts of ${chapter}, textbook style, labeled, colorful`, narration: `Let's start with the fundamental concepts of ${chapter}. Pay close attention to the key terms and definitions shown here.` },
+        { image_prompt: `Detailed infographic showing formulas and definitions for ${chapter}, clean layout, study notes style`, narration: `Here are the important formulas and definitions you need to remember for your exam. Make sure to write these down.` },
+        { image_prompt: `Colorful flowchart showing the process described in ${chapter}, step by step, educational illustration`, narration: `This flowchart breaks down the process step by step. Understanding this sequence is crucial for your exam preparation.` },
+        { image_prompt: `Summary mind map with important points from ${chapter}, exam preparation, key highlights marked`, narration: `Finally, here's a summary of everything important from this chapter. Review these key points before your exam.` },
       ];
     }
 
     console.log(`📝 Generated ${scenes.length} scene descriptions`);
 
-    // ── Step 2: Generate video clips in parallel via Bytez ──
-    console.log(`🎬 Step 2: Generating ${scenes.length} video clips via Bytez (Wan-2.1)...`);
+    // ── Step 2: Generate images via Pollinations.ai (FREE, no API key) ──
+    console.log(`🖼️ Step 2: Generating ${scenes.length} images via Pollinations.ai (Flux)...`);
 
     const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    
-    const clipPromises = scenes.map(async (scene, idx) => {
+
+    const slidePromises = scenes.map(async (scene, idx) => {
       try {
-        console.log(`  🎥 Clip ${idx + 1}: "${scene.slice(0, 50)}..."`);
-        
-        // Try state-of-the-art Wan-2.1 first, zeroscope as backup
-        const VIDEO_MODELS = [
-          "Wan-AI/Wan2.1-T2V-1.3B",
-          "cerspense/zeroscope_v2_576w",
-        ];
+        const prompt = encodeURIComponent(scene.image_prompt);
+        const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=576&nologo=true&seed=${Date.now() + idx}`;
 
-        let data = null;
-        for (const model of VIDEO_MODELS) {
-          try {
-            const controller = new AbortController();
-            // Wan-2.1 is heavy, give it a massive 8 minute timeout
-            const timeout = setTimeout(() => controller.abort(), 480000);
+        console.log(`  🖼️ Slide ${idx + 1}: "${scene.image_prompt.slice(0, 50)}..."`);
 
-            const response = await fetch(`https://api.bytez.com/models/v2/${model}`, {
-              method: "POST",
-              signal: controller.signal,
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": bytezKey,
-              },
-              body: JSON.stringify({ text: scene }),
-            });
+        // Download the image
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout per image
 
-            clearTimeout(timeout);
+        const imgRes = await fetch(imageUrl, { signal: controller.signal });
+        clearTimeout(timeout);
 
-            if (!response.ok) {
-              console.warn(`  ⚠️ Clip ${idx + 1} failed with ${model} (${response.status})`);
-              continue; // try next model
-            }
-
-            data = await response.json();
-            const videoUrl = data.output || data.output_url || data.url;
-            
-            if (videoUrl) {
-              console.log(`  ✅ Clip ${idx + 1} generated via ${model.split("/")[0]}`);
-
-              // Download the clip to public/videos/
-              const filename = `clip_${sessionId}_${idx}.mp4`;
-              const filePath = path.join(VIDEOS_DIR, filename);
-              
-              const dlRes = await fetch(videoUrl);
-              if (!dlRes.ok) {
-                console.warn(`  ⚠️ Clip ${idx + 1}: download failed`);
-                continue;
-              }
-
-              const fileStream = fs.createWriteStream(filePath);
-              await pipeline(Readable.fromWeb(dlRes.body), fileStream);
-
-              console.log(`  💾 Clip ${idx + 1} saved: ${filename}`);
-              return {
-                url: `/videos/${filename}`,
-                scene: scene,
-                index: idx,
-              };
-            }
-          } catch (modelErr) {
-            console.warn(`  ⚠️ Clip ${idx + 1} failed with ${model}: ${modelErr.message}`);
-            continue;
-          }
+        if (!imgRes.ok) {
+          console.warn(`  ⚠️ Slide ${idx + 1}: Pollinations returned ${imgRes.status}`);
+          return null;
         }
-        // All models failed for this clip
-        console.warn(`  ❌ Clip ${idx + 1}: all models failed`);
-        return null;
+
+        const filename = `slide_${sessionId}_${idx}.jpg`;
+        const filePath = path.join(IMAGES_DIR, filename);
+
+        const arrayBuf = await imgRes.arrayBuffer();
+        fs.writeFileSync(filePath, Buffer.from(arrayBuf));
+
+        console.log(`  ✅ Slide ${idx + 1} saved: ${filename} (${Math.round(arrayBuf.byteLength / 1024)}KB)`);
+
+        return {
+          url: `/images/slides/${filename}`,
+          scene: scene.image_prompt,
+          narration: scene.narration,
+          index: idx,
+        };
       } catch (err) {
-        console.warn(`  ⚠️ Clip ${idx + 1} error: ${err.message}`);
+        console.warn(`  ⚠️ Slide ${idx + 1} error: ${err.message}`);
         return null;
       }
     });
 
-    const clipResults = await Promise.all(clipPromises);
-    const clips = clipResults.filter(Boolean).sort((a, b) => a.index - b.index);
+    const slideResults = await Promise.all(slidePromises);
+    const slides = slideResults.filter(Boolean).sort((a, b) => a.index - b.index);
 
-    if (clips.length === 0) {
-      console.warn("⚠️ All clips failed, falling back to YouTube");
-      return res.status(502).json({ 
-        error: "Video generation failed for all scenes.", 
-        fallback: "youtube" 
+    if (slides.length === 0) {
+      console.warn("⚠️ All slides failed, falling back to YouTube");
+      return res.status(502).json({
+        error: "Image generation failed for all scenes.",
+        fallback: "youtube",
       });
     }
 
-    console.log(`🎬 Successfully generated ${clips.length}/${scenes.length} clips`);
+    console.log(`🖼️ Successfully generated ${slides.length}/${scenes.length} slides`);
 
-    // ── Step 3: Clean up old clips (keep last 20 sessions only) ──
+    // ── Step 3: Clean up old slides (keep last 40 files) ──
     try {
-      const allFiles = fs.readdirSync(VIDEOS_DIR).filter(f => f.startsWith("clip_"));
-      if (allFiles.length > 100) {
+      const allFiles = fs.readdirSync(IMAGES_DIR).filter(f => f.startsWith("slide_"));
+      if (allFiles.length > 40) {
         const sorted = allFiles.sort();
-        const toDelete = sorted.slice(0, sorted.length - 100);
-        toDelete.forEach(f => fs.unlinkSync(path.join(VIDEOS_DIR, f)));
-        console.log(`🧹 Cleaned ${toDelete.length} old video clips`);
+        sorted.slice(0, sorted.length - 40).forEach(f => fs.unlinkSync(path.join(IMAGES_DIR, f)));
+        console.log(`🧹 Cleaned old slide images`);
       }
     } catch {}
 
     return res.json({
-      clips,
+      slides,
       sessionId,
       chapter,
-      totalClips: clips.length,
-      type: "playlist",
+      totalSlides: slides.length,
+      type: "slideshow",
     });
 
   } catch (err) {
-    console.error("Video generation error:", err);
+    console.error("Slideshow generation error:", err);
     return res.status(500).json({ error: "An unexpected error occurred.", fallback: "youtube" });
   }
 });
