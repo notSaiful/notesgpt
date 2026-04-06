@@ -2227,6 +2227,31 @@ body {
   color: var(--accent-light);
 }
 
+.audio-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-decoration: none;
+}
+
+.audio-download-btn:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.audio-download-btn.hidden {
+  display: none;
+}
+
 /* ══════════════════════════════════════════════
    VIDEO HELP
    ══════════════════════════════════════════════ */

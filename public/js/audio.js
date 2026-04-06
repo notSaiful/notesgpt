@@ -28,6 +28,7 @@ const AudioPlayer = (() => {
     els.progressBar = document.getElementById("audio-progress-fill");
     els.timeText    = document.getElementById("audio-time");
     els.speedBtn    = document.getElementById("audio-speed-btn");
+    els.downloadBtn = document.getElementById("audio-download-btn");
     els.loading     = document.getElementById("audio-gen-loading");
     els.modeLabel   = document.getElementById("audio-mode-label");
     els.charLabel   = document.getElementById("audio-char-label");
@@ -157,6 +158,12 @@ const AudioPlayer = (() => {
     if (els.player)  els.player.classList.remove("hidden");
     if (els.modeLabel) els.modeLabel.textContent = "🎧 Neural AI Voice";
     if (els.playBtn) els.playBtn.textContent = "⏸";
+
+    // Show download button with the MP3 URL
+    if (els.downloadBtn) {
+      els.downloadBtn.href = url;
+      els.downloadBtn.classList.remove("hidden");
+    }
 
     // Create HTML5 audio element
     if (audioElement) { audioElement.pause(); audioElement.src = ""; }
@@ -290,6 +297,8 @@ const AudioPlayer = (() => {
       els.charLabel.style.display = "block";
       els.charLabel.textContent = "📖 Preparing narration…";
     }
+    // Hide download for browser TTS mode (no file to download)
+    if (els.downloadBtn) els.downloadBtn.classList.add("hidden");
   }
 
   function togglePlayback() {
@@ -332,6 +341,12 @@ const AudioPlayer = (() => {
       audioElement.pause();
       audioElement.src = "";
       audioElement = null;
+    }
+
+    // Hide download button
+    if (els.downloadBtn) {
+      els.downloadBtn.classList.add("hidden");
+      els.downloadBtn.removeAttribute("href");
     }
 
     // Stop browser TTS
