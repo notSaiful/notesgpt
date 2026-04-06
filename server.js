@@ -6,6 +6,7 @@ const { pipeline } = require("stream/promises");
 const { Readable } = require("stream");
 const { createClient } = require("@supabase/supabase-js");
 const HubSpot = require("./hubspot");
+const Email = require("./email");
 
 // ── Supabase Init ────────────────────────────────────────────
 let supabase = null;
@@ -2062,7 +2063,36 @@ app.post("/api/hubspot/track", async (req, res) => {
     if (!email || !eventType) return;
 
     if (eventType === "signup") {
+      // CRM sync
       await HubSpot.onStudentSignup({ email, user_metadata: data || {} });
+      // Welcome email
+      Email.sendWelcomeEmail(email, {
+        name: data?.full_name || email.split("@")[0],
+        provider: data?.provider || "email",
+      });
+    } else if (eventType === "notes_generated") {
+      await HubSpot.onStudyEvent(email, eventType, data || {});
+      // Study summary email
+      Email.sendStudySummaryEmail(email, {
+        name: email.split("@")[0],
+        classNum: data?.class_level || "",
+        subject: data?.subject || "",
+        chapter: data?.chapter || "",
+        wordCount: data?.word_count || 500,
+      });
+    } else if (eventType === "test_submitted") {
+      await HubSpot.onStudyEvent(email, eventType, data || {});
+      // Test score email
+      if (data?.score !== undefined && data?.total) {
+        Email.sendTestScoreEmail(email, {
+          name: email.split("@")[0],
+          classNum: data?.class_level || "",
+          subject: data?.subject || "",
+          chapter: data?.chapter || "",
+          score: data.awarded ?? data.score,
+          total: data.total,
+        });
+      }
     } else if (eventType === "landing_cta_clicked") {
       await HubSpot.upsertContact(email, {
         lead_source: "Landing Page CTA",
@@ -2078,13 +2108,63 @@ app.post("/api/hubspot/track", async (req, res) => {
   }
 });
 
+// ── Email: Streak Reminder Cron Endpoint ─────────────────────────
+// Call this every 24h via Render cron or external scheduler
+app.post("/api/email/streak-reminders", async (req, res) => {
+  // Secured with a simple secret
+  const secret = req.headers["x-cron-secret"] || req.body?.secret;
+  if (secret !== (process.env.CRON_SECRET || "notesgpt-cron-2026")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  res.json({ ok: true, message: "Streak reminders triggered" });
+
+  // Query Supabase for users inactive 2+ days
+  if (!supabase) return;
+  try {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select("email, full_name, last_chapter, last_subject, last_class, last_study_at")
+      .lt("last_study_at", twoDaysAgo)
+      .not("email", "is", null)
+      .limit(100);
+
+    if (error) { console.warn("Streak reminder query error:", error.message); return; }
+
+    let sent = 0;
+    for (const p of profiles || []) {
+      const daysSince = Math.floor((Date.now() - new Date(p.last_study_at).getTime()) / (1000 * 60 * 60 * 24));
+      await Email.sendStreakReminderEmail(p.email, {
+        name: p.full_name || p.email.split("@")[0],
+        lastChapter: p.last_chapter,
+        lastSubject: p.last_subject,
+        lastClass: p.last_class,
+        daysSince,
+      });
+      sent++;
+    }
+    console.log(`📧 Streak reminders sent: ${sent}`);
+  } catch (err) {
+    console.warn("⚠️ Streak reminder error:", err.message);
+  }
+});
+
+
 // ── Start server ─────────────────────────────────────────────
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 NotesGPT server running at http://localhost:${PORT}`);
 
   if (process.env.HUBSPOT_API_KEY) {
-    console.log("🤝 HubSpot CRM integration: ACTIVE");
+    console.log("🤝 HubSpot CRM: ACTIVE");
   } else {
-    console.warn("⚠️  HubSpot CRM: HUBSPOT_API_KEY not set — add it to .env to activate CRM sync");
+    console.warn("⚠️  HubSpot CRM: HUBSPOT_API_KEY not set");
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    console.log("📧 Resend Email: ACTIVE (welcome, study summary, test scores, streak reminders)");
+    Email.testConnection();
+  } else {
+    console.warn("⚠️  Resend Email: RESEND_API_KEY not set");
   }
 });
