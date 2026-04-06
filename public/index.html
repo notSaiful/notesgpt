@@ -154,11 +154,17 @@
   </script>
 
   <!-- ══ Fonts ════════════════════════════════════════════════ -->
+  <!-- Preconnect for faster font loading -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Preload critical stylesheet — eliminates render-blocking -->
+  <link rel="preload" href="/css/style.css?v=8" as="style" />
   <link rel="stylesheet" href="/css/style.css?v=8" />
-
+  <!-- Fonts loaded async to prevent FOIT (Flash of Invisible Text) -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" /></noscript>
+</head>
 <body>
   <!-- Film Grain Noise -->
   <svg class="noise-overlay" style="display:none;">
@@ -191,6 +197,7 @@
     </a>
     <nav class="app-header__nav">
       <a href="how-it-works.html" class="app-header__link">How It Works</a>
+      <a href="cbse-notes.html" class="app-header__link">CBSE Notes</a>
       <a href="about.html" class="app-header__link">About</a>
       <a href="privacy.html" class="app-header__link">Privacy</a>
       <!-- Auth: Sign In button (shown when logged out) -->
@@ -1143,12 +1150,19 @@
 
     <footer class="footer">
       <div class="footer-nav">
+        <a href="cbse-notes.html">CBSE Study Notes</a>
         <a href="how-it-works.html">How It Works</a>
         <a href="about.html">About</a>
         <a href="privacy.html">Privacy Policy</a>
         <a href="terms.html">Terms of Service</a>
       </div>
-      <p>Built with ❤️ for CBSE students &bull; Powered by AI</p>
+      <div class="footer-nav" style="margin-top:8px;font-size:0.78rem;opacity:0.6;">
+        <a href="cbse-notes.html">Class 10 Science Notes</a>
+        <a href="cbse-notes.html">Class 12 Physics Notes</a>
+        <a href="cbse-notes.html">CBSE Board Exam Prep</a>
+        <a href="cbse-notes.html">Free NCERT Notes</a>
+      </div>
+      <p>Free AI CBSE Study Notes for Class 6–12 &bull; Built with ❤️ for Indian students &bull; Powered by AI</p>
     </footer>
   </main>
 

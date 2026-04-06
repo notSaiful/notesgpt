@@ -20,12 +20,44 @@ if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
   console.warn("⚠️  Supabase not configured — auth features disabled. Set SUPABASE_URL and SUPABASE_SERVICE_KEY in .env");
 }
 
+const compression = require("compression");
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Middleware ────────────────────────────────────────────────
+// ── SEO & Performance Middleware ──────────────────────────────
+
+// Gzip all responses — reduces payload by 60-80%, improves Core Web Vitals
+app.use(compression());
+
+// Security headers — Google trust signals + XSS/clickjacking protection
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+
+// Parse JSON request bodies
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+
+// Aggressive cache for static assets (JS, CSS, images) — 1 year
+// HTML files get short cache so updates roll out quickly
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: "1y",
+  setHeaders(res, filePath) {
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    } else if (filePath.match(/\.(js|css)$/)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    } else if (filePath.match(/\.(png|jpg|jpeg|svg|ico|webp|woff2)$/)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+  },
+}));
+
 
 // ── Free models to try (best quality + speed first) ─────────
 const FREE_MODELS = [
