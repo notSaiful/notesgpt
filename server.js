@@ -1493,8 +1493,8 @@ Output ONLY the spoken script. Nothing else.`;
   }
 });
 
-// ── API route: generate memory song (Sonauto AI Music → real sung lyrics) ─
-// Primary: Sonauto API (real music with vocals & instruments)
+// ── API route: generate memory song (Google Lyria 3 Pro → real sung lyrics) ─
+// Primary: Google Lyria 3 Pro via OpenRouter (48kHz stereo music + vocals)
 // Fallback: Bytez suno/bark (speech-style singing)
 const AUDIO_DIR = path.join(__dirname, "public", "audio");
 if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
@@ -1557,117 +1557,90 @@ Output song lyrics only. Nothing else.`;
                        level === "low"  ? "Comeback Track" :
                                           "Study Groove";
 
-    // ── Step 2: Try Sonauto (real AI music with vocals) ──
-    const sonautoKey = process.env.SONAUTO_API_KEY;
-    if (sonautoKey) {
-      try {
-        console.log("🎶 Attempting Sonauto music generation...");
+    // ── Step 2: Try Google Lyria 3 Pro (real AI music with vocals via OpenRouter) ──
+    try {
+      console.log("🎶 Attempting Google Lyria 3 Pro music generation...");
 
-        const styleTags = level === "high"
-          ? ["pop", "upbeat", "energetic", "happy", "catchy", "vocals"]
-          : level === "low"
-          ? ["acoustic", "inspiring", "warm", "motivational", "vocals"]
-          : ["pop", "chill", "educational", "medium tempo", "catchy", "vocals"];
+      const musicPrompt = `Create a catchy educational song for students about "${chapter}" (${subject || "General"}, Class ${classNum || 10}).
 
-        // Submit generation request
-        const genRes = await fetch("https://api.sonauto.ai/v1/generations/v2", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sonautoKey}`,
-          },
-          body: JSON.stringify({
-            prompt: `A catchy educational song about ${chapter} for students. ${mood} mood.`,
-            lyrics: cleanLyrics,
-            tags: styleTags,
-            instrumental: false,
-            output_format: "mp3",
-            num_songs: 1,
-          }),
-        });
+The song should:
+- Be ${mood} in mood
+- Style: ${styleLabel}
+- Have clear vocals singing the following lyrics:
 
-        if (!genRes.ok) {
-          const errBody = await genRes.text();
-          console.warn(`⚠️ Sonauto generation failed (${genRes.status}): ${errBody.slice(0, 200)}`);
-          throw new Error("Sonauto generation failed");
-        }
+${cleanLyrics}
 
-        const genData = await genRes.json();
-        const taskId = genData.task_id || genData.id;
-        if (!taskId) {
-          console.warn("⚠️ Sonauto: no task_id returned", genData);
-          throw new Error("No task ID");
-        }
+Make it extremely catchy, memorable, and suitable for students to learn from. Include a full instrumental arrangement with vocals.`;
 
-        console.log(`🎶 Sonauto task started: ${taskId}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
 
-        // Poll for completion (max 3 minutes)
-        let audioUrl = null;
-        const maxPolls = 36; // 36 × 5s = 180s
-        for (let i = 0; i < maxPolls; i++) {
-          await new Promise(r => setTimeout(r, 5000));
+      const lyResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://notesgpt.online",
+          "X-Title": "NotesGPT",
+        },
+        body: JSON.stringify({
+          model: "google/lyria-3-pro-preview",
+          messages: [
+            { role: "user", content: musicPrompt },
+          ],
+          modalities: ["audio"],
+          audio: { format: "mp3" },
+        }),
+      });
 
-          const statusRes = await fetch(`https://api.sonauto.ai/v1/generations/status/${taskId}`, {
-            headers: { "Authorization": `Bearer ${sonautoKey}` },
-          });
+      clearTimeout(timeout);
 
-          if (!statusRes.ok) continue;
-          const statusData = await statusRes.json();
-
-          if (statusData.status === "completed" || statusData.status === "complete") {
-            // Get the audio URL from the response
-            audioUrl = statusData.song_url || statusData.audio_url ||
-                       (statusData.songs && statusData.songs[0] && statusData.songs[0].song_url) ||
-                       (statusData.songs && statusData.songs[0] && statusData.songs[0].audio_url);
-            break;
-          } else if (statusData.status === "failed" || statusData.status === "error") {
-            console.warn("⚠️ Sonauto task failed:", statusData);
-            throw new Error("Sonauto generation failed");
-          }
-
-          console.log(`⏳ Sonauto polling (${i + 1}/${maxPolls}): ${statusData.status || "processing"}...`);
-        }
-
-        if (!audioUrl) {
-          throw new Error("Sonauto timed out");
-        }
-
-        console.log(`✅ Sonauto audio ready: ${audioUrl}`);
-
-        // Download the audio file to local storage
-        const dlRes = await fetch(audioUrl);
-        if (!dlRes.ok) throw new Error("Failed to download Sonauto audio");
-
-        const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const filename = `song_${sessionId}.mp3`;
-        const filePath = path.join(AUDIO_DIR, filename);
-
-        const arrayBuf = await dlRes.arrayBuffer();
-        fs.writeFileSync(filePath, Buffer.from(arrayBuf));
-
-        console.log(`✅ Sonauto song saved: ${filename} (${Math.round(arrayBuf.byteLength / 1024)}KB)`);
-
-        // Clean up old songs (keep last 20)
-        try {
-          const allSongs = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("song_"));
-          if (allSongs.length > 20) {
-            const sorted = allSongs.sort();
-            sorted.slice(0, sorted.length - 20).forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
-          }
-        } catch {}
-
-        return res.json({
-          audio_url: `/audio/${filename}`,
-          lyrics: cleanLyrics,
-          style: styleLabel,
-          tags: styleTags,
-          engine: "sonauto",
-        });
-
-      } catch (sonautoErr) {
-        console.warn("⚠️ Sonauto failed, falling back to Bark:", sonautoErr.message);
-        // Fall through to Bark fallback below
+      if (!lyResponse.ok) {
+        const errBody = await lyResponse.text();
+        console.warn(`⚠️ Lyria Pro failed (${lyResponse.status}): ${errBody.slice(0, 200)}`);
+        throw new Error(`Lyria Pro failed: ${lyResponse.status}`);
       }
+
+      const lyData = await lyResponse.json();
+
+      // Extract base64 audio from response
+      const audioB64 = lyData.choices?.[0]?.message?.audio?.data;
+      if (!audioB64) {
+        console.warn("⚠️ Lyria Pro returned no audio data", JSON.stringify(lyData).slice(0, 300));
+        throw new Error("No audio data in Lyria response");
+      }
+
+      console.log(`✅ Lyria Pro audio received (${Math.round(audioB64.length * 0.75 / 1024)}KB)`);
+
+      // Save audio file
+      const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const filename = `song_${sessionId}.mp3`;
+      const filePath = path.join(AUDIO_DIR, filename);
+
+      fs.writeFileSync(filePath, Buffer.from(audioB64, "base64"));
+      console.log(`✅ Lyria song saved: ${filename}`);
+
+      // Clean up old songs (keep last 20)
+      try {
+        const allSongs = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("song_"));
+        if (allSongs.length > 20) {
+          const sorted = allSongs.sort();
+          sorted.slice(0, sorted.length - 20).forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
+        }
+      } catch {}
+
+      return res.json({
+        audio_url: `/audio/${filename}`,
+        lyrics: cleanLyrics,
+        style: styleLabel,
+        tags: [mood],
+        engine: "lyria-3-pro",
+      });
+
+    } catch (lyriaErr) {
+      console.warn("⚠️ Lyria Pro failed, falling back to TTS:", lyriaErr.message);
+      // Fall through to TTS fallback below
     }
 
     // ── Step 3: Fallback — Bytez suno/bark (speech-style singing) ──
