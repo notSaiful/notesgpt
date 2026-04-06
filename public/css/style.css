@@ -4948,23 +4948,24 @@ a, button, input, select, textarea {
   25%, 100% { opacity: 0; transform: translateY(-16px); z-index: 1; }
 }
 
-/* Disable 3D tilt on mobile (can cause jank), keep float animation alive */
+/* Mobile: keep card animation running, just simplify layout */
 @media (max-width: 768px) {
   .lp-hero__body {
     height: auto;
-  }
-  .mockup-screen {
-    animation: none;
-    opacity: 1;
-    transform: translateY(0);
+    min-height: 280px;
     position: relative;
   }
-  .mockup-screen--2, 
-  .mockup-screen--3, 
-  .mockup-screen--4 {
-    display: none;
+  .mockup-screen {
+    animation: hero-sequence 10s infinite;
+    position: absolute;
+    inset: 0;
   }
+  .mockup-screen--1 { animation-delay: 0s; }
+  .mockup-screen--2 { animation-delay: 2.5s; }
+  .mockup-screen--3 { animation-delay: 5.0s; }
+  .mockup-screen--4 { animation-delay: 7.5s; }
 }
+
 
 /* ── Common Mockup Elements ── */
 .ms-header {
