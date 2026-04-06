@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Block duplicate/internal paths
+Disallow: /assets/
+Disallow: /audio/
+Disallow: /videos/
+
+# Sitemap
+Sitemap: https://notesgpt.onrender.com/sitemap.xml
+
+# Crawl delay (be kind to our server)
+Crawl-delay: 5
