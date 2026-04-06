@@ -1,19 +1,22 @@
 // ══════════════════════════════════════════════
-// NotesGPT — Audiobook System (Web Speech API)
-// Generates AI narration script → plays via browser TTS
-// Proper chunking, voice selection, progress tracking
+// NotesGPT — Audiobook System (Neural TTS MP3)
+// Generates AI narration → Microsoft Neural voice MP3
+// Falls back to browser TTS if MP3 generation fails
 // ══════════════════════════════════════════════
 
 const AudioPlayer = (() => {
   // ── State ──────────────────────────────────
-  let sentences   = [];   // array of sentence strings
-  let currentIdx  = 0;
   let isPlaying   = false;
   let isPaused    = false;
   let playbackRate = 1.0;
+  let audioElement = null;  // HTML5 <audio> for MP3
+  let mode = "idle";        // idle | audio-file | text-only
+
+  // Browser TTS fallback state
+  let sentences = [];
+  let currentIdx = 0;
   let selectedVoice = null;
   let utteranceInProgress = null;
-  let fullScript  = "";
 
   // ── DOM refs ───────────────────────────────
   const els = {};
@@ -31,40 +34,26 @@ const AudioPlayer = (() => {
     els.loadingP    = els.loading ? els.loading.querySelector("p") : null;
   }
 
-  // ── Pick best available voice ──────────────
+  // ── Pick best browser voice (fallback) ─────
   function pickVoice() {
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
-
-    // Priority order — best sounding voices for English narration
     const preferred = [
-      "Google UK English Female",
-      "Google US English",
-      "Google UK English Male",
-      "Microsoft Zira - English (United States)",
-      "Microsoft David - English (United States)",
-      "Samantha",
-      "Karen",
-      "Daniel",
+      "Google UK English Female", "Google US English",
+      "Google UK English Male", "Samantha", "Karen", "Daniel",
     ];
-
     for (const name of preferred) {
       const v = voices.find(v => v.name === name);
       if (v) return v;
     }
-
-    // Fallback: first English voice
     return voices.find(v => v.lang.startsWith("en")) || voices[0];
   }
 
-  // ── Split script into sentence chunks ──────
-  // Keeps chunks ≤200 chars to avoid Chrome's 15s TTS timeout bug
+  // ── Split text for browser TTS (fallback) ──
   function splitIntoChunks(text) {
-    // Split on sentence boundaries
     const raw = text.match(/[^.!?…]+[.!?…]+["']?\s*/g) || [text];
     const chunks = [];
     let buffer = "";
-
     for (const sentence of raw) {
       if ((buffer + sentence).length > 200 && buffer.trim()) {
         chunks.push(buffer.trim());
@@ -84,25 +73,19 @@ const AudioPlayer = (() => {
     if (els.playBtn)   els.playBtn.addEventListener("click", togglePlayback);
     if (els.speedBtn)  els.speedBtn.addEventListener("click", cycleSpeed);
 
-    // Load voices (Chrome loads them asynchronously)
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        selectedVoice = pickVoice();
-      };
+    // Load browser voices (fallback)
+    if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = () => { selectedVoice = pickVoice(); };
     }
-    selectedVoice = pickVoice();
+    if (window.speechSynthesis) selectedVoice = pickVoice();
   }
 
-  function show() {
-    if (els.section) els.section.classList.remove("hidden");
-  }
+  function show() { if (els.section) els.section.classList.remove("hidden"); }
+  function hide() { stop(); if (els.section) els.section.classList.add("hidden"); }
 
-  function hide() {
-    stop();
-    if (els.section) els.section.classList.add("hidden");
-  }
-
-  // ── Generate audiobook ────────────────────
+  // ══════════════════════════════════════════════
+  // GENERATE AUDIOBOOK
+  // ══════════════════════════════════════════════
   async function generate() {
     const notesEl = document.getElementById("notes-content");
     const summaryText = notesEl ? notesEl.innerText.slice(0, 4000) : "";
@@ -111,15 +94,15 @@ const AudioPlayer = (() => {
       return;
     }
 
-    // Reset state
+    // Reset
     stop();
     if (els.player)  els.player.classList.add("hidden");
     if (els.loading) els.loading.classList.remove("hidden");
     if (els.charLabel) { els.charLabel.style.display = "none"; els.charLabel.textContent = ""; }
-    if (els.loadingP) els.loadingP.textContent = "AI is writing your narration script…";
+    if (els.loadingP) els.loadingP.textContent = "AI is generating your audiobook…";
     if (els.listenBtn) {
       els.listenBtn.disabled = true;
-      els.listenBtn.textContent = "⏳ Generating script…";
+      els.listenBtn.textContent = "⏳ Generating audiobook…";
     }
 
     try {
@@ -135,96 +118,155 @@ const AudioPlayer = (() => {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate script.");
+      if (!res.ok) throw new Error(data.error || "Failed to generate audiobook.");
 
-      fullScript = data.script || summaryText;
-      sentences  = splitIntoChunks(fullScript);
-      currentIdx = 0;
-
-      const mins = data.estimatedMinutes || Math.ceil(sentences.length * 0.12);
-      showPlayer(mins);
-
-      // Auto-start playing
-      setTimeout(() => startPlayback(), 300);
+      if (data.type === "audio-file" && data.audio_url) {
+        // ── Play real MP3 audio ──
+        mode = "audio-file";
+        setupAudioPlayer(data.audio_url, data.estimatedMinutes || 3);
+      } else if (data.script) {
+        // ── Fallback: browser TTS ──
+        mode = "text-only";
+        sentences = splitIntoChunks(data.script);
+        currentIdx = 0;
+        showPlayer(data.estimatedMinutes || 3, "🔊 Browser Voice");
+        setTimeout(() => startBrowserTTS(), 300);
+      } else {
+        throw new Error("No audio data received.");
+      }
 
     } catch (err) {
       if (els.loading) els.loading.classList.add("hidden");
       if (els.charLabel) {
         els.charLabel.style.display = "block";
-        els.charLabel.textContent   = "❌ " + err.message;
+        els.charLabel.textContent = "❌ " + err.message;
       }
     } finally {
       if (els.listenBtn) {
-        els.listenBtn.disabled    = false;
+        els.listenBtn.disabled = false;
         els.listenBtn.textContent = "▶ Generate & Listen";
       }
     }
   }
 
-  // ── Show player UI ─────────────────────────
-  function showPlayer(estimatedMins) {
-    if (els.loading)   els.loading.classList.add("hidden");
-    if (els.player)    els.player.classList.remove("hidden");
-    if (els.modeLabel) els.modeLabel.textContent = "🎧 AI Audiobook";
-    if (els.playBtn)   els.playBtn.textContent = "⏸";
-    if (els.timeText)  els.timeText.textContent = `~${estimatedMins || 3} min`;
+  // ══════════════════════════════════════════════
+  // MP3 AUDIO PLAYER (Primary — Neural TTS)
+  // ══════════════════════════════════════════════
+  function setupAudioPlayer(url, estimatedMins) {
+    if (els.loading) els.loading.classList.add("hidden");
+    if (els.player)  els.player.classList.remove("hidden");
+    if (els.modeLabel) els.modeLabel.textContent = "🎧 Neural AI Voice";
+    if (els.playBtn) els.playBtn.textContent = "⏸";
+
+    // Create HTML5 audio element
+    if (audioElement) { audioElement.pause(); audioElement.src = ""; }
+    audioElement = new Audio(url);
+    audioElement.playbackRate = playbackRate;
+
+    // Progress tracking
+    audioElement.addEventListener("timeupdate", () => {
+      if (!audioElement.duration) return;
+      const pct = (audioElement.currentTime / audioElement.duration) * 100;
+      if (els.progressBar) els.progressBar.style.width = `${pct}%`;
+
+      // Time display
+      const cur = formatTime(audioElement.currentTime);
+      const tot = formatTime(audioElement.duration);
+      if (els.timeText) els.timeText.textContent = `${cur} / ${tot}`;
+    });
+
+    audioElement.addEventListener("ended", () => {
+      isPlaying = false;
+      isPaused = false;
+      if (els.playBtn) els.playBtn.textContent = "▶";
+      if (els.charLabel) els.charLabel.textContent = "✅ Audiobook complete! Great revision session.";
+      if (els.progressBar) els.progressBar.style.width = "100%";
+    });
+
+    audioElement.addEventListener("error", (e) => {
+      console.warn("Audio playback error:", e);
+      if (els.charLabel) {
+        els.charLabel.style.display = "block";
+        els.charLabel.textContent = "⚠️ Audio playback failed. Try regenerating.";
+      }
+    });
+
+    // Show duration once loaded
+    audioElement.addEventListener("loadedmetadata", () => {
+      const dur = formatTime(audioElement.duration);
+      if (els.timeText) els.timeText.textContent = `0:00 / ${dur}`;
+    });
+
     if (els.charLabel) {
       els.charLabel.style.display = "block";
-      els.charLabel.textContent   = "📖 Preparing narration…";
+      els.charLabel.textContent = "📖 Playing Neural AI narration…";
     }
+
+    // Auto-play
+    isPlaying = true;
+    isPaused = false;
+    audioElement.play().catch(err => {
+      console.warn("Autoplay blocked:", err.message);
+      isPlaying = false;
+      if (els.playBtn) els.playBtn.textContent = "▶";
+      if (els.charLabel) els.charLabel.textContent = "▶ Press play to start";
+    });
   }
 
-  // ── Playback ───────────────────────────────
-  function startPlayback() {
+  function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
+  // ══════════════════════════════════════════════
+  // BROWSER TTS FALLBACK
+  // ══════════════════════════════════════════════
+  function startBrowserTTS() {
     isPlaying = true;
-    isPaused  = false;
+    isPaused = false;
     if (els.playBtn) els.playBtn.textContent = "⏸";
     speakChunk(currentIdx);
   }
 
   function speakChunk(idx) {
     if (idx >= sentences.length) {
-      onComplete();
+      isPlaying = false;
+      isPaused = false;
+      if (els.playBtn) els.playBtn.textContent = "▶";
+      if (els.charLabel) els.charLabel.textContent = "✅ Audiobook complete!";
+      if (els.progressBar) els.progressBar.style.width = "100%";
       return;
     }
 
     currentIdx = idx;
-    updateProgress(idx);
-
+    const pct = Math.round((idx / sentences.length) * 100);
+    if (els.progressBar) els.progressBar.style.width = `${pct}%`;
     if (els.charLabel) {
       const preview = sentences[idx].slice(0, 60);
       els.charLabel.textContent = `📖 ${idx + 1}/${sentences.length}: "${preview}…"`;
     }
 
-    // Cancel any existing utterance
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(sentences[idx]);
-    utterance.rate  = playbackRate;
+    utterance.rate = playbackRate;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
-
-    // Re-pick voice each utterance (Chrome sometimes loses it)
     if (!selectedVoice) selectedVoice = pickVoice();
-    if (selectedVoice)  utterance.voice = selectedVoice;
+    if (selectedVoice) utterance.voice = selectedVoice;
 
     utterance.onend = () => {
-      if (isPlaying && !isPaused) {
-        speakChunk(idx + 1);
-      }
+      if (isPlaying && !isPaused) speakChunk(idx + 1);
     };
-
     utterance.onerror = (e) => {
       if (e.error === "interrupted" || e.error === "canceled") return;
-      console.warn("TTS error:", e.error, "— skipping chunk", idx);
       if (isPlaying && !isPaused) speakChunk(idx + 1);
     };
 
     utteranceInProgress = utterance;
     window.speechSynthesis.speak(utterance);
 
-    // Chrome bug workaround: speechSynthesis pauses after ~15s in background
-    // Keep it alive by nudging it every 10s
+    // Chrome bug workaround
     if (!window._ttsBugFix) {
       window._ttsBugFix = setInterval(() => {
         if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
@@ -235,68 +277,86 @@ const AudioPlayer = (() => {
     }
   }
 
-  function togglePlayback() {
-    if (!sentences.length) return;
+  // ══════════════════════════════════════════════
+  // SHARED CONTROLS
+  // ══════════════════════════════════════════════
+  function showPlayer(estimatedMins, label) {
+    if (els.loading)   els.loading.classList.add("hidden");
+    if (els.player)    els.player.classList.remove("hidden");
+    if (els.modeLabel) els.modeLabel.textContent = label || "🎧 AI Audiobook";
+    if (els.playBtn)   els.playBtn.textContent = "⏸";
+    if (els.timeText)  els.timeText.textContent = `~${estimatedMins || 3} min`;
+    if (els.charLabel) {
+      els.charLabel.style.display = "block";
+      els.charLabel.textContent = "📖 Preparing narration…";
+    }
+  }
 
-    if (isPlaying && !isPaused) {
-      // Pause
-      window.speechSynthesis.pause();
-      isPlaying = false;
-      isPaused  = true;
-      if (els.playBtn) els.playBtn.textContent = "▶";
-    } else if (isPaused) {
-      // Resume from pause
-      window.speechSynthesis.resume();
-      isPlaying = true;
-      isPaused  = false;
-      if (els.playBtn) els.playBtn.textContent = "⏸";
-    } else {
-      // Fresh start or restart
-      startPlayback();
+  function togglePlayback() {
+    if (mode === "audio-file" && audioElement) {
+      if (isPlaying && !isPaused) {
+        audioElement.pause();
+        isPlaying = false;
+        isPaused = true;
+        if (els.playBtn) els.playBtn.textContent = "▶";
+      } else {
+        audioElement.play();
+        isPlaying = true;
+        isPaused = false;
+        if (els.playBtn) els.playBtn.textContent = "⏸";
+      }
+    } else if (mode === "text-only") {
+      if (isPlaying && !isPaused) {
+        window.speechSynthesis.pause();
+        isPlaying = false;
+        isPaused = true;
+        if (els.playBtn) els.playBtn.textContent = "▶";
+      } else if (isPaused) {
+        window.speechSynthesis.resume();
+        isPlaying = true;
+        isPaused = false;
+        if (els.playBtn) els.playBtn.textContent = "⏸";
+      } else {
+        startBrowserTTS();
+      }
     }
   }
 
   function stop() {
     isPlaying = false;
-    isPaused  = false;
-    window.speechSynthesis.cancel();
+    isPaused = false;
+    mode = "idle";
+
+    // Stop MP3
+    if (audioElement) {
+      audioElement.pause();
+      audioElement.src = "";
+      audioElement = null;
+    }
+
+    // Stop browser TTS
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     utteranceInProgress = null;
     currentIdx = 0;
+    sentences = [];
+
     if (window._ttsBugFix) { clearInterval(window._ttsBugFix); window._ttsBugFix = null; }
-    if (els.playBtn)    els.playBtn.textContent = "▶";
-    updateProgress(0);
+    if (els.playBtn) els.playBtn.textContent = "▶";
+    if (els.progressBar) els.progressBar.style.width = "0%";
   }
 
-  function onComplete() {
-    isPlaying  = false;
-    isPaused   = false;
-    currentIdx = 0;
-    if (window._ttsBugFix) { clearInterval(window._ttsBugFix); window._ttsBugFix = null; }
-    if (els.playBtn)   els.playBtn.textContent = "▶";
-    if (els.charLabel) els.charLabel.textContent = "✅ Audiobook complete! Great revision session.";
-    if (els.timeText)  els.timeText.textContent = "Done";
-    updateProgress(100);
-  }
-
-  // ── Speed control ──────────────────────────
   function cycleSpeed() {
     const speeds = [1.0, 1.25, 1.5, 1.75, 0.75];
-    const idx    = speeds.indexOf(playbackRate);
-    playbackRate  = speeds[(idx + 1) % speeds.length];
+    const idx = speeds.indexOf(playbackRate);
+    playbackRate = speeds[(idx + 1) % speeds.length];
     if (els.speedBtn) els.speedBtn.textContent = `${playbackRate}x`;
 
-    // Restart current chunk at new speed (cancel & re-speak)
-    if (isPlaying && !isPaused) {
+    if (mode === "audio-file" && audioElement) {
+      audioElement.playbackRate = playbackRate;
+    } else if (mode === "text-only" && isPlaying && !isPaused) {
       window.speechSynthesis.cancel();
       speakChunk(currentIdx);
     }
-  }
-
-  // ── Progress bar ───────────────────────────
-  function updateProgress(idx) {
-    if (!els.progressBar || !sentences.length) return;
-    const pct = Math.round((idx / sentences.length) * 100);
-    els.progressBar.style.width = `${pct}%`;
   }
 
   return { init, show, hide, stop };

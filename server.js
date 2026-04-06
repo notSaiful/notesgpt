@@ -1312,7 +1312,9 @@ Format strictly as a JSON object (no markdown, no extra text):
   }
 });
 
-// ── API route: generate audiobook (AI script + Bytez bark TTS) ─
+// ── API route: generate audiobook (AI script → edge-tts Neural MP3) ─
+// Uses Microsoft's Neural TTS engine — completely free, no API key needed
+// Returns a real MP3 file URL with studio-quality voice
 app.post("/api/generate-audio-script", async (req, res) => {
   try {
     const { classNum, subject, chapter, summaryText } = req.body;
@@ -1324,8 +1326,8 @@ app.post("/api/generate-audio-script", async (req, res) => {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
 
-    // ── Generate a clean, natural narration script via AI ──
-    const systemMsg = "You are a friendly, engaging CBSE teacher narrating a lesson. Output ONLY the spoken script — plain conversational sentences. No markdown, no bullet points, no headings, no special characters.";
+    // ── Step 1: Generate a clean narration script via AI ──
+    const systemMsg = "You are a friendly, engaging CBSE teacher narrating a lesson. Output ONLY the spoken script — plain conversational sentences. No markdown, no bullet points, no headings, no special characters. No asterisks or symbols.";
     const prompt = `Convert the following study notes into a natural spoken narration script for a Class ${classNum || 10} ${subject || "Science"} student.
 
 Chapter: "${chapter}"
@@ -1334,10 +1336,11 @@ Rules:
 - Write ONLY what would be spoken aloud — plain sentences only
 - Speak directly to the student: use "you" and "we"
 - Use transitions: "Now let's look at...", "The important thing here is...", "Remember that..."
-- Keep it to 300-450 words (about 3 minutes spoken at normal pace)
+- Keep it to 300-500 words (about 3-4 minutes spoken)
 - Emphasize exam points naturally: "This is very important for your exam..."
 - Use comma placement for natural breathing rhythm
 - End with: "Good luck with your exam. You've got this."
+- NO markdown, NO asterisks, NO bullet points, NO headings — just plain spoken text
 
 Notes:
 ${summaryText.slice(0, 4000)}
@@ -1354,22 +1357,70 @@ Output ONLY the spoken script. Nothing else.`;
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
+    let script;
     if (!raw) {
-      // Fallback: clean up the notes text itself for TTS
-      const fallback = cleanScript(summaryText);
-      return res.json({ script: fallback, wordCount: fallback.split(/\s+/).length, type: "text-only" });
+      script = cleanScript(summaryText);
+    } else {
+      script = cleanScript(raw);
     }
 
-    const script = cleanScript(raw);
     const wordCount = script.split(/\s+/).length;
     console.log(`🎧 Audiobook script ready: ~${wordCount} words`);
 
-    return res.json({
-      script,
-      wordCount,
-      estimatedMinutes: Math.ceil(wordCount / 140),
-      type: "text-only",
-    });
+    // ── Step 2: Convert script to MP3 using Microsoft Neural TTS ──
+    try {
+      const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+
+      // Ensure audio directory exists
+      const audioDir = path.join(__dirname, "public", "audio");
+      if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+
+      // Generate unique filename
+      const filename = `audiobook_${Date.now()}.mp3`;
+      const filePath = path.join(audioDir, filename);
+
+      // Use an Indian English Neural voice for CBSE students
+      // Alternatives: en-US-AriaNeural, en-US-GuyNeural, en-GB-SoniaNeural
+      const voice = "en-IN-NeerjaExpressiveNeural";
+
+      const tts = new MsEdgeTTS();
+      await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+
+      const { audioStream } = tts.toStream(script);
+      const writeStream = fs.createWriteStream(filePath);
+      
+      audioStream.pipe(writeStream);
+
+      // Wait for file to finish writing
+      await new Promise((resolve, reject) => {
+        writeStream.on("finish", resolve);
+        writeStream.on("error", reject);
+        audioStream.on("error", reject);
+      });
+
+      const fileSize = fs.statSync(filePath).size;
+      console.log(`✅ Neural TTS audio saved: ${filename} (${Math.round(fileSize / 1024)}KB)`);
+
+      return res.json({
+        audio_url: `/audio/${filename}`,
+        script,
+        wordCount,
+        estimatedMinutes: Math.ceil(wordCount / 140),
+        type: "audio-file",
+        voice,
+      });
+
+    } catch (ttsErr) {
+      console.warn("⚠️ Edge-TTS failed, falling back to text-only:", ttsErr.message);
+      // Fallback: return script for browser TTS
+      return res.json({
+        script,
+        wordCount,
+        estimatedMinutes: Math.ceil(wordCount / 140),
+        type: "text-only",
+      });
+    }
+
   } catch (err) {
     console.error("Audiobook error:", err);
     return res.status(500).json({ error: "An unexpected error occurred." });

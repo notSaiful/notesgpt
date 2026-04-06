@@ -4701,6 +4701,24 @@ a, button, input, select, textarea {
   25%, 100% { opacity: 0; transform: translateY(-16px); z-index: 1; }
 }
 
+/* Disable hero animation on mobile, just show the first screen */
+@media (max-width: 768px) {
+  .hero-mockup__body {
+    height: auto;
+  }
+  .mockup-screen {
+    animation: none;
+    opacity: 1;
+    transform: translateY(0);
+    position: relative;
+  }
+  .mockup-screen--2, 
+  .mockup-screen--3, 
+  .mockup-screen--4 {
+    display: none;
+  }
+}
+
 /* ── Common Mockup Elements ── */
 .ms-header {
   font-size: 0.9rem;
@@ -5764,9 +5782,15 @@ a, button, input, select, textarea {
     left: 50%;
     transform: translateX(-50%);
     opacity: 0.4;
-    animation: float3DElementMobile 8s ease-in-out infinite;
   }
 }
+
+@media (max-width: 768px) {
+  .lp-hero-3d-element {
+    animation: none;
+  }
+}
+
 @keyframes float3DElementMobile {
   0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
   50% { transform: translateX(-50%) translateY(-20px) scale(1.02); }
