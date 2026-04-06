@@ -1427,7 +1427,9 @@ Output ONLY the spoken script. Nothing else.`;
   }
 });
 
-// ── API route: generate memory song (Bytez suno/bark — free) ─
+// ── API route: generate memory song (Sonauto AI Music → real sung lyrics) ─
+// Primary: Sonauto API (real music with vocals & instruments)
+// Fallback: Bytez suno/bark (speech-style singing)
 const AUDIO_DIR = path.join(__dirname, "public", "audio");
 if (!fs.existsSync(AUDIO_DIR)) fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
@@ -1442,17 +1444,14 @@ app.post("/api/generate-music", async (req, res) => {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return res.status(500).json({ error: "Server misconfiguration." });
 
-    const bytezKey = process.env.BYTEZ_API_KEY;
-    if (!bytezKey) return res.status(500).json({ error: "Bytez API key not configured." });
-
-    // ── Step 1: Generate lyrics via OpenRouter ──
+    // ── Step 1: Generate lyrics via AI ──
     const level = performanceLevel || "medium";
     const mood = level === "high" ? "celebratory, upbeat, victorious" :
                  level === "low"  ? "motivational, encouraging, comeback" :
                                     "focused, steady, educational";
 
     const points = keyPoints || chapter;
-    const systemMsg = "You are a creative songwriter who writes catchy educational songs. Output ONLY the song lyrics, nothing else.";
+    const systemMsg = "You are a creative songwriter who writes catchy educational songs. Output ONLY the song lyrics, nothing else. No titles, no brackets, no instructions.";
     const lyricsPrompt = `Create a short educational song for a CBSE Class ${classNum || 10} student.
 
 Subject: ${subject || "General"}
@@ -1462,21 +1461,18 @@ Key points to cover:
 ${typeof points === "string" ? points : JSON.stringify(points)}
 
 Requirements:
-- Keep it VERY short (4-6 lines maximum, under 50 words total)
-- Make it extremely catchy and easy to remember
-- Include important formulas, definitions, or concepts
+- Write 8-12 lines of catchy, rhythmic lyrics
+- Include important formulas, definitions, or concepts from the chapter
+- Make it extremely memorable and fun to sing
 - Use simple language a student would enjoy
 - The mood should be: ${mood}
-- Make it rhythmic and fun to sing along
-- Wrap each line in ♪ symbols for singing
+- Structure: verse, chorus, verse format
+- Make every line teach something from the chapter
+- Do NOT include any titles, section labels, or brackets
 
-Example format:
-♪ Atoms have protons in the core ♪
-♪ Electrons orbit, wanting more ♪
+Output song lyrics only. Nothing else.`;
 
-Output song lyrics only. No titles, no instructions, no brackets. Keep it under 50 words.`;
-
-    const lyrics = await callOpenRouter(apiKey, systemMsg, lyricsPrompt, 500);
+    const lyrics = await callOpenRouter(apiKey, systemMsg, lyricsPrompt, 600);
     if (!lyrics) {
       return res.status(502).json({ error: "Failed to generate lyrics." });
     }
@@ -1484,24 +1480,151 @@ Output song lyrics only. No titles, no instructions, no brackets. Keep it under 
     const cleanLyrics = lyrics
       .replace(/\*\*/g, "").replace(/\*/g, "")
       .replace(/#/g, "").replace(/\[.*?\]/g, "")
+      .replace(/^(Verse|Chorus|Bridge|Outro|Intro).*$/gmi, "")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
 
     console.log(`🎵 Generated lyrics: ${cleanLyrics.split(/\s+/).length} words`);
 
-    // ── Step 2: Style label ──
+    // ── Style config ──
     const styleLabel = level === "high" ? "Victory Anthem" :
                        level === "low"  ? "Comeback Track" :
                                           "Study Groove";
+
+    // ── Step 2: Try Sonauto (real AI music with vocals) ──
+    const sonautoKey = process.env.SONAUTO_API_KEY;
+    if (sonautoKey) {
+      try {
+        console.log("🎶 Attempting Sonauto music generation...");
+
+        const styleTags = level === "high"
+          ? ["pop", "upbeat", "energetic", "happy", "catchy", "vocals"]
+          : level === "low"
+          ? ["acoustic", "inspiring", "warm", "motivational", "vocals"]
+          : ["pop", "chill", "educational", "medium tempo", "catchy", "vocals"];
+
+        // Submit generation request
+        const genRes = await fetch("https://api.sonauto.ai/v1/generations/v2", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${sonautoKey}`,
+          },
+          body: JSON.stringify({
+            prompt: `A catchy educational song about ${chapter} for students. ${mood} mood.`,
+            lyrics: cleanLyrics,
+            tags: styleTags,
+            instrumental: false,
+            output_format: "mp3",
+            num_songs: 1,
+          }),
+        });
+
+        if (!genRes.ok) {
+          const errBody = await genRes.text();
+          console.warn(`⚠️ Sonauto generation failed (${genRes.status}): ${errBody.slice(0, 200)}`);
+          throw new Error("Sonauto generation failed");
+        }
+
+        const genData = await genRes.json();
+        const taskId = genData.task_id || genData.id;
+        if (!taskId) {
+          console.warn("⚠️ Sonauto: no task_id returned", genData);
+          throw new Error("No task ID");
+        }
+
+        console.log(`🎶 Sonauto task started: ${taskId}`);
+
+        // Poll for completion (max 3 minutes)
+        let audioUrl = null;
+        const maxPolls = 36; // 36 × 5s = 180s
+        for (let i = 0; i < maxPolls; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+
+          const statusRes = await fetch(`https://api.sonauto.ai/v1/generations/status/${taskId}`, {
+            headers: { "Authorization": `Bearer ${sonautoKey}` },
+          });
+
+          if (!statusRes.ok) continue;
+          const statusData = await statusRes.json();
+
+          if (statusData.status === "completed" || statusData.status === "complete") {
+            // Get the audio URL from the response
+            audioUrl = statusData.song_url || statusData.audio_url ||
+                       (statusData.songs && statusData.songs[0] && statusData.songs[0].song_url) ||
+                       (statusData.songs && statusData.songs[0] && statusData.songs[0].audio_url);
+            break;
+          } else if (statusData.status === "failed" || statusData.status === "error") {
+            console.warn("⚠️ Sonauto task failed:", statusData);
+            throw new Error("Sonauto generation failed");
+          }
+
+          console.log(`⏳ Sonauto polling (${i + 1}/${maxPolls}): ${statusData.status || "processing"}...`);
+        }
+
+        if (!audioUrl) {
+          throw new Error("Sonauto timed out");
+        }
+
+        console.log(`✅ Sonauto audio ready: ${audioUrl}`);
+
+        // Download the audio file to local storage
+        const dlRes = await fetch(audioUrl);
+        if (!dlRes.ok) throw new Error("Failed to download Sonauto audio");
+
+        const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const filename = `song_${sessionId}.mp3`;
+        const filePath = path.join(AUDIO_DIR, filename);
+
+        const arrayBuf = await dlRes.arrayBuffer();
+        fs.writeFileSync(filePath, Buffer.from(arrayBuf));
+
+        console.log(`✅ Sonauto song saved: ${filename} (${Math.round(arrayBuf.byteLength / 1024)}KB)`);
+
+        // Clean up old songs (keep last 20)
+        try {
+          const allSongs = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("song_"));
+          if (allSongs.length > 20) {
+            const sorted = allSongs.sort();
+            sorted.slice(0, sorted.length - 20).forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
+          }
+        } catch {}
+
+        return res.json({
+          audio_url: `/audio/${filename}`,
+          lyrics: cleanLyrics,
+          style: styleLabel,
+          tags: styleTags,
+          engine: "sonauto",
+        });
+
+      } catch (sonautoErr) {
+        console.warn("⚠️ Sonauto failed, falling back to Bark:", sonautoErr.message);
+        // Fall through to Bark fallback below
+      }
+    }
+
+    // ── Step 3: Fallback — Bytez suno/bark (speech-style singing) ──
+    const bytezKey = process.env.BYTEZ_API_KEY;
+    if (!bytezKey) {
+      // No fallback available — return lyrics only
+      return res.json({
+        lyrics: cleanLyrics,
+        style: styleLabel,
+        tags: [],
+        engine: "lyrics-only",
+        error: "Music generation unavailable. Here are your lyrics to sing along!",
+      });
+    }
+
     const styleTags = level === "high"
       ? ["pop", "upbeat", "energetic", "happy"]
       : level === "low"
       ? ["acoustic", "inspiring", "warm", "motivational"]
       : ["pop", "chill", "educational", "medium tempo"];
 
-    // ── Step 3: Format for Bark singing ──
-    // Bark uses ♪ to indicate singing and [laughs] etc for expressions
+    // Format for Bark singing
     let barkPrompt = cleanLyrics;
-    // Ensure lyrics have ♪ notation for singing
     if (!barkPrompt.includes("♪")) {
       barkPrompt = barkPrompt.split("\n").filter(l => l.trim())
         .map(line => `♪ ${line.trim()} ♪`)
@@ -1510,9 +1633,8 @@ Output song lyrics only. No titles, no instructions, no brackets. Keep it under 
 
     console.log(`🎤 Sending to Bark for singing: ${barkPrompt.slice(0, 80)}...`);
 
-    // ── Step 4: Generate audio via Bytez suno/bark ──
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 180000); // 3 min timeout
+    const timeout = setTimeout(() => controller.abort(), 180000);
 
     const barkRes = await fetch("https://api.bytez.com/models/v2/suno/bark", {
       method: "POST",
@@ -1533,7 +1655,7 @@ Output song lyrics only. No titles, no instructions, no brackets. Keep it under 
     }
 
     const barkData = await barkRes.json();
-    
+
     if (barkData.error) {
       console.warn(`⚠️ Bark error: ${barkData.error}`);
       return res.status(502).json({ error: "Song generation failed: " + barkData.error });
@@ -1545,23 +1667,22 @@ Output song lyrics only. No titles, no instructions, no brackets. Keep it under 
       return res.status(502).json({ error: "No audio generated." });
     }
 
-    // ── Step 5: Save WAV to public/audio/ ──
+    // Save WAV to public/audio/
     const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const filename = `song_${sessionId}.wav`;
     const filePath = path.join(AUDIO_DIR, filename);
 
     const audioBuffer = Buffer.from(audioBase64, "base64");
     fs.writeFileSync(filePath, audioBuffer);
-    
+
     console.log(`✅ Memory song saved: ${filename} (${Math.round(audioBuffer.length / 1024)}KB)`);
 
-    // ── Step 6: Clean up old songs (keep last 20) ──
+    // Clean up old songs (keep last 20)
     try {
       const allSongs = fs.readdirSync(AUDIO_DIR).filter(f => f.startsWith("song_"));
       if (allSongs.length > 20) {
         const sorted = allSongs.sort();
-        const toDelete = sorted.slice(0, sorted.length - 20);
-        toDelete.forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
+        sorted.slice(0, sorted.length - 20).forEach(f => fs.unlinkSync(path.join(AUDIO_DIR, f)));
       }
     } catch {}
 
@@ -1570,10 +1691,11 @@ Output song lyrics only. No titles, no instructions, no brackets. Keep it under 
       lyrics: cleanLyrics,
       style: styleLabel,
       tags: styleTags,
+      engine: "bark",
     });
   } catch (err) {
     if (err.name === "AbortError") {
-      console.warn("⚠️ Bark song generation timed out");
+      console.warn("⚠️ Song generation timed out");
       return res.status(504).json({ error: "Song generation timed out." });
     }
     console.error("Music generation error:", err);
