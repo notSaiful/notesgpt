@@ -1,10 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" fill="none" class="notesgpt-logo">
-  <path d="M20 15 C20 10, 25 5, 30 5 L65 5 C70 5, 75 10, 75 15 L75 75 C75 80, 70 85, 65 85 L30 85 C25 85, 20 80, 20 75 Z" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
-  <path d="M20 70 L75 70" stroke="#ffffff" stroke-width="6" />
-  
-  <path d="M32 25 L58 25" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <path d="M32 40 L58 40" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  <path d="M32 55 L45 55" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  
-  <path d="M 100 10 Q 100 25, 115 25 Q 100 25, 100 40 Q 100 25, 85 25 Q 100 25, 100 10 Z" fill="#ffffff" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Book/Notepad body -->
+  <rect x="10" y="8" width="36" height="46" rx="5" ry="5" fill="white" stroke="white" stroke-width="1"/>
+  <!-- Bottom page edge -->
+  <path d="M10 48 Q10 54 16 54 L40 54 Q46 54 46 48" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <!-- Text lines -->
+  <line x1="18" y1="22" x2="38" y2="22" stroke="#09090b" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="18" y1="31" x2="38" y2="31" stroke="#09090b" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="18" y1="40" x2="32" y2="40" stroke="#09090b" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Sparkle star (4-pointed) -->
+  <path d="M52 8 L54 14 L60 16 L54 18 L52 24 L50 18 L44 16 L50 14 Z" fill="white"/>
 </svg>

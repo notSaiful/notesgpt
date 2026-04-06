@@ -191,11 +191,14 @@ body {
 
 @media (max-width: 768px) {
   .app-header {
-    padding: 0 20px;
-    height: 70px;
+    padding: 0 16px;
+    height: 60px;
   }
   .app-header__nav {
-    display: none; /* Mobile menu can be added later if needed */
+    display: none;
+  }
+  .container {
+    padding-top: 80px;
   }
 }
 
@@ -5160,7 +5163,7 @@ a, button, input, select, textarea {
 @media (max-width: 900px) {
   .lp-hero {
     flex-direction: column;
-    padding-top: 100px;
+    padding-top: 80px;
     text-align: center;
   }
   .lp-hero__left { margin-bottom: 24px; }
