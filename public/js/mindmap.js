@@ -48,6 +48,15 @@ const MindMap = (() => {
       renderSvg(mapData);
       setGlobalView("mindmap");
       window.scrollTo({ top: 0, behavior: "smooth" });
+      // ― GA: Mind map viewed ―
+      if (typeof GA !== "undefined") {
+        GA.mindmapViewed(classNum, subject, chapter);
+        GA.send("mindmap_nodes", {
+          event_category: "engagement",
+          node_count: (data.mindmap?.nodes || []).length,
+          chapter,
+        });
+      }
     } catch (err) {
       alert("Mind map error: " + err.message);
       setGlobalView("output");

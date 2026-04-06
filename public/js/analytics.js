@@ -31,6 +31,38 @@ const GA = (() => {
     }
   }
 
+  // ── User Identity (critical for cross-device tracking) ──────
+  // Call this once after login with the Supabase user ID
+  function setUser(userId, properties = {}) {
+    if (!ready() || !userId) return;
+    try {
+      // Set user_id for cross-device/session stitching
+      window.gtag("config", MEASUREMENT_ID, { user_id: userId });
+      // Set user properties — these persist on the user in GA4
+      window.gtag("set", "user_properties", {
+        user_class: properties.class || null,
+        user_subject: properties.subject || null,
+        account_type: properties.accountType || "free",
+        signup_method: properties.provider || "email",
+      });
+    } catch (e) { /* silent */ }
+  }
+
+  // ── Performance Timing ──────────────────────────────────────
+  const _timers = {};
+  function startTimer(label) { _timers[label] = performance.now(); }
+  function endTimer(label, eventName, extraParams = {}) {
+    if (!_timers[label]) return;
+    const durationMs = Math.round(performance.now() - _timers[label]);
+    delete _timers[label];
+    send(eventName || `${label}_timing`, {
+      event_category: "performance",
+      duration_ms: durationMs,
+      duration_seconds: Math.round(durationMs / 1000),
+      ...extraParams,
+    });
+  }
+
   // ── Conversion Events (Most Important) ─────────────────────
 
   // User signs up for the first time
@@ -272,6 +304,11 @@ const GA = (() => {
   return {
     // Init
     init,
+    // Identity
+    setUser,
+    // Timing
+    startTimer,
+    endTimer,
     // Conversions
     signUp,
     signIn,

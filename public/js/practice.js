@@ -196,6 +196,17 @@ const Practice = (() => {
     if (typeof Tracker !== "undefined") {
       Tracker.savePractice(sessionClass, sessionSubject, sessionChapter, attempted, questions.length, solutionsViewed);
     }
+    // ― GA: Practice completed ―
+    if (typeof GA !== "undefined") {
+      GA.practiceCompleted(sessionClass, sessionSubject, sessionChapter);
+      GA.send("practice_details", {
+        event_category: "study_flow",
+        questions_total: questions.length,
+        questions_attempted: attempted,
+        solutions_viewed: solutionsViewed,
+        completion_pct: Math.round((attempted / Math.max(questions.length, 1)) * 100),
+      });
+    }
   }
 
   return { init, start };

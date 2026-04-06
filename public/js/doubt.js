@@ -136,6 +136,10 @@ const DoubtSolver = (() => {
       if (!res.ok) throw new Error(data.error || "Failed to get answer.");
 
       showResponse(data.answer);
+      // ― GA: Doubt asked ―
+      if (typeof GA !== "undefined") {
+        GA.doubtAsked(window.currentClassNum, window.currentSubject);
+      }
     } catch (err) {
       showResponse("❌ " + err.message);
     }

@@ -37,6 +37,11 @@ const Auth = (() => {
         if ((event === "SIGNED_IN") && currentUser?.email) {
           if (typeof GA !== "undefined") {
             GA.signIn(currentUser.app_metadata?.provider || "email");
+            // Set user_id for cross-device tracking (use UUID, never email)
+            GA.setUser(currentUser.id, {
+              provider: currentUser.app_metadata?.provider || "email",
+              accountType: "free",
+            });
           }
           if (typeof HubTrack !== "undefined") {
             HubTrack.onSignup(currentUser.email, {

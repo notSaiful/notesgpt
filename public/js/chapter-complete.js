@@ -186,6 +186,20 @@ const ChapterComplete = (() => {
         preview: `✅ Chapter Completed | Score: ${displayScore} | Accuracy: ${displayAccuracy}`,
       });
     }
+
+    // ── GA: Chapter fully completed (highest-value event) ──
+    if (typeof GA !== "undefined") {
+      GA.chapterCompleted(className, subjectName, chapterName);
+      GA.send("chapter_mastery", {
+        event_category: "retention",
+        class_level: `Class ${className}`,
+        subject: subjectName,
+        chapter: chapterName,
+        final_accuracy: accuracyNum || 0,
+        arena_score: data.arenaScore || 0,
+        performance: accuracyNum >= 90 ? "mastered" : accuracyNum >= 70 ? "proficient" : "completed",
+      });
+    }
   }
 
   /**

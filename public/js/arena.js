@@ -261,6 +261,22 @@ const ExamArena = {
         preview: `Arena Score: ${this.score} | Streak: ${this.maxStreak} | ${rating}`
       });
     }
+
+    // ― GA: Arena completed ―
+    if (typeof GA !== "undefined") {
+      GA.send("arena_completed", {
+        event_category: "study_flow",
+        class_level: `Class ${window.currentClassNum}`,
+        subject: window.currentSubject,
+        chapter: window.currentChapter,
+        arena_score: this.score,
+        accuracy_pct: accuracy,
+        max_streak: this.maxStreak,
+        speed_rating: rating,
+        time_seconds: Math.round(this.totalTimeTaken),
+        performance: accuracy >= 90 ? "champion" : accuracy >= 70 ? "strong" : "needs_practice",
+      });
+    }
   }
 };
 

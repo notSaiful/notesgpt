@@ -189,6 +189,18 @@ const Flashcards = (() => {
     if (typeof Tracker !== "undefined") {
       Tracker.saveFlashcards(sessionClass, sessionSubject, sessionChapter, knew, partial, didnt);
     }
+    // ― GA: Flashcards completed ―
+    if (typeof GA !== "undefined") {
+      GA.flashcardsCompleted(sessionClass, sessionSubject, sessionChapter);
+      GA.send("flashcards_score", {
+        event_category: "study_flow",
+        knew_count: knew,
+        partial_count: partial,
+        retry_count: didnt,
+        total: knew + partial + didnt,
+        mastery_pct: Math.round((knew / Math.max(knew + partial + didnt, 1)) * 100),
+      });
+    }
 
     setGlobalView("flashcard-complete");
   }
