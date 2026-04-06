@@ -7,9 +7,17 @@
 // 4. Streak Reminder (2 days idle)
 // ══════════════════════════════════════════════
 
-const { Resend } = require("resend");
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+let Resend, resend;
+try {
+  ({ Resend } = require("resend"));
+  if (process.env.RESEND_API_KEY) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  } else {
+    console.warn("⚠️  RESEND_API_KEY not set — email service disabled");
+  }
+} catch (e) {
+  console.warn("⚠️  Resend module not available:", e.message);
+}
 const FROM = "NotesGPT <onboarding@resend.dev>"; // Update to your domain when ready
 const APP_URL = "https://notesgpt.online";
 
