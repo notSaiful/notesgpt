@@ -11,7 +11,7 @@ const { Resend } = require("resend");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = "NotesGPT <onboarding@resend.dev>"; // Update to your domain when ready
-const APP_URL = "https://notesgpt.onrender.com";
+const APP_URL = "https://notesgpt.online";
 
 // ── Shared email styles ────────────────────────
 const BASE_STYLES = `

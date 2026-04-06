@@ -8,7 +8,7 @@ const ShareManager = (() => {
 
   // ── Build shareable message ─────────────────
   function buildMessage(type, classNum, subject, chapter, score = null) {
-    const base = `https://notesgpt.onrender.com/?utm_source=whatsapp&utm_medium=share&utm_campaign=${type}`;
+    const base = `https://notesgpt.online/?utm_source=whatsapp&utm_medium=share&utm_campaign=${type}`;
 
     switch (type) {
       case "notes":

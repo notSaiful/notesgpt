@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════
 // NotesGPT — Google Analytics 4 Event Tracker
-// Measurement ID: G-5J7MKXNT45
+// Measurement ID: G-F603XH7TC3
 //
 // Tracks all meaningful student interactions:
 // - Study flow progression (notes → test → song)
@@ -10,7 +10,7 @@
 // ══════════════════════════════════════════════
 
 const GA = (() => {
-  const MEASUREMENT_ID = "G-5J7MKXNT45";
+  const MEASUREMENT_ID = "G-F603XH7TC3";
 
   // Check if gtag is loaded
   function ready() {

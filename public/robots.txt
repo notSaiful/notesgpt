@@ -8,7 +8,7 @@ Disallow: /audio/
 Disallow: /videos/
 
 # Sitemap
-Sitemap: https://notesgpt.onrender.com/sitemap.xml
+Sitemap: https://notesgpt.online/sitemap.xml
 
 # Crawl delay (be kind to our server)
 Crawl-delay: 5

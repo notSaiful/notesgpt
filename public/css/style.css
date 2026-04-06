@@ -4635,6 +4635,56 @@ a, button, input, select, textarea {
 
 /* 1. Hero */
 /* 1. Hero (Redesigned 2-Column Demo) */
+
+/* Hero badge — always white */
+.lp-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 100px;
+  padding: 8px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  letter-spacing: 0.01em;
+}
+
+/* Hero animation classes */
+.animate-float {
+  animation: animFloat 3s ease-in-out infinite;
+}
+.animate-type-pop {
+  animation: typePop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+.animate-fade-delay {
+  animation: animFadeUp 0.6s ease 0.3s both;
+}
+.animate-fade-delay-2 {
+  animation: animFadeUp 0.6s ease 0.6s both;
+}
+
+@keyframes animFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes animFadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* On mobile — keep animations but simpler (no perspective) */
+@media (max-width: 768px) {
+  .animate-type-pop {
+    animation: animFadeUp 0.5s ease both;
+  }
+  .animate-float {
+    animation: animFloat 3s ease-in-out infinite;
+  }
+}
+
 .lp-hero {
   min-height: 95vh;
   display: flex;
@@ -4756,9 +4806,9 @@ a, button, input, select, textarea {
   25%, 100% { opacity: 0; transform: translateY(-16px); z-index: 1; }
 }
 
-/* Disable hero animation on mobile, just show the first screen */
+/* Disable 3D tilt on mobile (can cause jank), keep float animation alive */
 @media (max-width: 768px) {
-  .hero-mockup__body {
+  .lp-hero__body {
     height: auto;
   }
   .mockup-screen {
@@ -4968,9 +5018,25 @@ a, button, input, select, textarea {
   color: #fff;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .lp-hero__title { font-size: 2.5rem; }
   .lp-hero__sub { font-size: 1.1rem; }
+  /* Center the badge and CTA button on mobile */
+  .lp-hero__badge {
+    margin-left: auto;
+    margin-right: auto;
+    color: #ffffff !important;
+  }
+  .lp-hero__actions {
+    align-items: center;
+    width: 100%;
+  }
+  .lp-cta-btn {
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+    justify-content: center;
+  }
 }
 
 /* 2. Hook */
@@ -5842,7 +5908,9 @@ a, button, input, select, textarea {
 
 @media (max-width: 768px) {
   .lp-hero-3d-element {
-    animation: none;
+    /* Use mobile-safe animation without perspective transforms */
+    animation: float3DElementMobile 8s ease-in-out infinite !important;
+    opacity: 0.35;
   }
 }
 
