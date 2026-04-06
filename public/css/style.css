@@ -4948,23 +4948,36 @@ a, button, input, select, textarea {
   25%, 100% { opacity: 0; transform: translateY(-16px); z-index: 1; }
 }
 
-/* Mobile: keep card animation, expand to fit screen */
+/* Mobile: compact card that fits hero nicely */
 @media (max-width: 768px) {
   .lp-hero__right {
     width: 100%;
     perspective: none;
+    margin-top: 20px;
   }
   .hero-mockup {
-    max-width: 100%;
+    max-width: 90%;
+    margin: 0 auto;
     transform: none;
-    border-radius: 14px;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.15);
   }
   .hero-mockup:hover {
     transform: none;
   }
+  .hero-mockup__header {
+    padding: 8px 12px;
+  }
+  .mockup-dot {
+    width: 8px;
+    height: 8px;
+  }
+  .mockup-title {
+    font-size: 0.65rem;
+  }
   .hero-mockup__body {
-    height: 320px;
-    padding: 16px;
+    height: 200px;
+    padding: 12px;
   }
   .mockup-screens {
     position: relative;
@@ -4975,14 +4988,24 @@ a, button, input, select, textarea {
     animation: hero-sequence 10s infinite;
     position: absolute;
     inset: 0;
-    padding: 16px;
-    border-radius: 10px;
+    padding: 14px;
+    border-radius: 8px;
+    overflow: hidden;
   }
   .mockup-screen--1 { animation-delay: 0s; }
   .mockup-screen--2 { animation-delay: 2.5s; }
   .mockup-screen--3 { animation-delay: 5.0s; }
   .mockup-screen--4 { animation-delay: 7.5s; }
+  /* Scale down inner content to fit */
+  .ms-header { font-size: 0.75rem; margin-bottom: 10px; }
+  .ms-skeleton { height: 10px; margin-bottom: 8px; border-radius: 4px; }
+  .ms-label { font-size: 0.65rem; }
+  .ms-flashcard { padding: 10px; font-size: 0.75rem; }
+  .ms-option { padding: 6px 10px; font-size: 0.7rem; margin-bottom: 4px; }
+  .ms-result-circle { width: 60px; height: 60px; }
+  .ms-result-score { font-size: 1.2rem; }
 }
+
 
 
 
@@ -5140,11 +5163,11 @@ a, button, input, select, textarea {
     padding-top: 100px;
     text-align: center;
   }
-  .lp-hero__left { margin-bottom: 40px; }
+  .lp-hero__left { margin-bottom: 24px; }
   .lp-hero__title { font-size: 2.5rem; }
   .lp-hero__sub { font-size: 1.1rem; }
-  .hero-mockup { max-width: 100%; transform: none; }
-  .hero-mockup__body { height: 320px; }
+  .hero-mockup { max-width: 90%; margin: 0 auto; transform: none; }
+  .hero-mockup__body { height: 220px; }
 }
 .lp-hero__title {
   font-size: 3.4rem;
