@@ -61,16 +61,13 @@ app.use(express.static(path.join(__dirname, "public"), {
 
 
 // ── Free models to try (best quality + speed first) ─────────
+// Note: Free tier = 50 req/day. Add $10 credits on OpenRouter for 1000/day.
 const FREE_MODELS = [
   "z-ai/glm-4.5-air:free",
-  "google/gemini-2.0-flash-001:free",
-  "google/gemma-3-27b-it:free",
-  "qwen/qwen3.6-plus-preview:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "google/gemma-3-4b-it:free",
+  "qwen/qwen3.6-plus:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
   "stepfun/step-3.5-flash:free",
-  "openrouter/free",
+  "arcee-ai/trinity-large-preview:free",
 ];
 
 // ── Subject mapping per class ────────────────────────────────
@@ -410,7 +407,12 @@ async function callOpenRouter(apiKey, systemMsg, prompt, maxTokens = 2048) {
         const errBody = await response.text();
         console.warn(`⚠️  ${model} failed (${response.status}): ${errBody.slice(0, 150)}`);
         
-        // Smart rate-limit handling: if per-minute limit, wait before next model
+        // Daily free limit hit — all free models share the same quota, skip to Bytez
+        if (response.status === 429 && errBody.includes("free-models-per-day")) {
+          console.log(`⛔ Daily free model limit reached — skipping to Bytez fallback`);
+          break;
+        }
+        // Per-minute rate limit — wait briefly then try next model
         if (response.status === 429 && errBody.includes("per-min")) {
           console.log(`⏸️  Per-minute rate limit hit — waiting 5s before next model...`);
           await new Promise(r => setTimeout(r, 5000));
