@@ -390,7 +390,39 @@ const AIVideo = (() => {
     window.open(`https://www.youtube.com/results?search_query=${query}`, "_blank");
   }
 
-  return { init, generate };
+  // ── Download all slides as images ──────────
+  function downloadSlides() {
+    if (slides.length === 0) {
+      if (typeof ShareManager !== "undefined") ShareManager.showToast("No slides to download.");
+      return;
+    }
+    slides.forEach((slide, i) => {
+      const a = document.createElement("a");
+      a.href = slide.imageUrl;
+      a.download = `slide-${i + 1}-${slide.title || "scene"}.png`;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      setTimeout(() => { a.click(); a.remove(); }, i * 300);
+    });
+    if (typeof ShareManager !== "undefined") ShareManager.showToast(`🖼️ Downloading ${slides.length} slides...`);
+  }
+
+  // ── Share AI video ────────────────────────
+  function shareVideo() {
+    if (typeof ShareManager !== "undefined") {
+      ShareManager.shareNative("aivideo", window.currentClassNum, window.currentSubject, window.currentChapter);
+    }
+  }
+
+  // ── Bind action buttons ───────────────────
+  function bindActionBtns() {
+    const dlBtn = document.getElementById("aivideo-dl-slides-btn");
+    const shareBtn = document.getElementById("aivideo-share-btn");
+    if (dlBtn) dlBtn.addEventListener("click", downloadSlides);
+    if (shareBtn) shareBtn.addEventListener("click", shareVideo);
+  }
+
+  return { init, generate, bindActionBtns };
 })();
 
-document.addEventListener("DOMContentLoaded", () => AIVideo.init());
+document.addEventListener("DOMContentLoaded", () => { AIVideo.init(); AIVideo.bindActionBtns(); });

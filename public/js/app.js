@@ -663,6 +663,79 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ── Notes Download & Share handlers ─────────
+  const notesDlPdf = document.getElementById("notes-dl-pdf");
+  const notesDlTxt = document.getElementById("notes-dl-txt");
+  const notesCopyBtn = document.getElementById("notes-copy-btn");
+  const notesShareBtn = document.getElementById("notes-share-btn");
+
+  function getNotesText() {
+    const el = document.getElementById("notes-content");
+    return el ? el.innerText : "";
+  }
+
+  if (notesDlPdf) {
+    notesDlPdf.addEventListener("click", () => {
+      const text = getNotesText();
+      if (!text) return;
+      if (typeof window.jspdf !== "undefined") {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF("p", "mm", "a4");
+        const margin = 15;
+        const pageW = pdf.internal.pageSize.getWidth() - margin * 2;
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(11);
+        const lines = pdf.splitTextToSize(text, pageW);
+        let y = margin;
+        lines.forEach(line => {
+          if (y > 280) { pdf.addPage(); y = margin; }
+          pdf.text(line, margin, y);
+          y += 6;
+        });
+        pdf.save(`notes-${window.currentChapter || "chapter"}.pdf`);
+      } else {
+        // Fallback: download as TXT
+        const blob = new Blob([text], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `notes-${window.currentChapter || "chapter"}.txt`;
+        a.click();
+      }
+      if (typeof ShareManager !== "undefined") ShareManager.showToast("📄 PDF downloaded!");
+    });
+  }
+
+  if (notesDlTxt) {
+    notesDlTxt.addEventListener("click", () => {
+      const text = getNotesText();
+      if (!text) return;
+      const blob = new Blob([text], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `notes-${window.currentChapter || "chapter"}.txt`;
+      a.click();
+      if (typeof ShareManager !== "undefined") ShareManager.showToast("📝 TXT downloaded!");
+    });
+  }
+
+  if (notesCopyBtn) {
+    notesCopyBtn.addEventListener("click", () => {
+      const text = getNotesText();
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        if (typeof ShareManager !== "undefined") ShareManager.showToast("📋 Notes copied!");
+      });
+    });
+  }
+
+  if (notesShareBtn) {
+    notesShareBtn.addEventListener("click", () => {
+      if (typeof ShareManager !== "undefined") {
+        ShareManager.shareNative("notes", window.currentClassNum, window.currentSubject, window.currentChapter);
+      }
+    });
+  }
+
   // ── Auth state listener — sync history on login / wipe on logout ──
   if (typeof Auth !== "undefined") {
     Auth.onAuthChange(async (user) => {

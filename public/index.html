@@ -642,6 +642,12 @@
         </div>
       </div>
       <div class="notes-content" id="notes-content"></div>
+      <div class="output__actions-bar" style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;">
+        <button class="btn btn--outline btn--sm" id="notes-dl-pdf" title="Download as PDF">📄 Download PDF</button>
+        <button class="btn btn--outline btn--sm" id="notes-dl-txt" title="Download as Text">📝 Download TXT</button>
+        <button class="btn btn--outline btn--sm" id="notes-copy-btn" title="Copy to clipboard">📋 Copy Notes</button>
+        <button class="btn btn--outline btn--sm" id="notes-share-btn" title="Share">📤 Share</button>
+      </div>
       <div class="output__actions">
         <button class="btn btn--accent" id="flashcard-btn" style="width:100%">Continue → Flashcards 🔒</button>
       </div>
@@ -950,6 +956,10 @@
       <div class="aivideo-player hidden" id="aivideo-player">
         <!-- Slideshow player is dynamically injected by aivideo.js -->
       </div>
+      <div class="aivideo-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+        <button class="btn btn--outline btn--sm" id="aivideo-dl-slides-btn" title="Download Slides">🖼️ Download Slides</button>
+        <button class="btn btn--outline btn--sm" id="aivideo-share-btn" title="Share">📤 Share</button>
+      </div>
       <button class="btn btn--accent" id="aivideo-continue-btn" style="margin-top:16px;">Continue → Memory Song 🎵</button>
     </section>
 
@@ -1144,6 +1154,11 @@
           <span class="music-time" id="music-time">0:00 / 0:00</span>
         </div>
         <div class="music-lyrics" id="music-lyrics"></div>
+        <div class="music-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+          <button class="btn btn--outline btn--sm" id="music-dl-btn" title="Download Song">⬇️ Download MP3</button>
+          <button class="btn btn--outline btn--sm" id="music-dl-lyrics-btn" title="Download Lyrics">📝 Lyrics TXT</button>
+          <button class="btn btn--outline btn--sm" id="music-share-btn" title="Share">📤 Share</button>
+        </div>
       </div>
       <div class="complete__actions" style="margin-top:20px;">
         <button class="btn btn--accent btn--lg" id="song-complete-btn">🎯 Final Step: Enter Exam Arena</button>
@@ -1314,14 +1329,14 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="/js/push-notifications.js"></script>
-  <script src="/js/share.js"></script>
+  <script src="/js/share.js?v=2"></script>
   <script src="/js/analytics.js"></script>
   <script src="/js/hubtrack.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/data.js?v=2"></script>
   <script src="/js/tracker.js"></script>
   <script src="/js/history.js"></script>
-  <script src="/js/app.js?v=2"></script>
+  <script src="/js/app.js?v=3"></script>
   <script src="/js/flashcards.js"></script>
   <script src="/js/practice.js"></script>
   <script src="/js/test.js"></script>
@@ -1329,8 +1344,8 @@
   <script src="/js/video.js"></script>
   <script src="/js/mindmap.js?v=2"></script>
   <script src="/js/audio.js"></script>
-  <script src="/js/music.js"></script>
-  <script src="/js/aivideo.js"></script>
+  <script src="/js/music.js?v=2"></script>
+  <script src="/js/aivideo.js?v=2"></script>
   <script src="/js/doubt.js?v=2"></script>
   <script src="/js/legendary.js"></script>
   <script src="/js/chapter-complete.js"></script>

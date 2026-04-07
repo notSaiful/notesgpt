@@ -161,7 +161,47 @@ const MusicPlayer = (() => {
     return `${m}:${s}`;
   }
 
-  return { init, show, hide };
+  // ── Download MP3 ───────────────────────────
+  function downloadMp3() {
+    if (!els.audio || !els.audio.src) return;
+    const a = document.createElement("a");
+    a.href = els.audio.src;
+    a.download = `memory-song-${window.currentChapter || "chapter"}.mp3`;
+    a.click();
+    if (typeof ShareManager !== "undefined") ShareManager.showToast("⬇️ Song downloaded!");
+  }
+
+  // ── Download Lyrics ────────────────────────
+  function downloadLyrics() {
+    if (!els.lyrics) return;
+    const text = els.lyrics.innerText;
+    if (!text) return;
+    const blob = new Blob([text], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `lyrics-${window.currentChapter || "chapter"}.txt`;
+    a.click();
+    if (typeof ShareManager !== "undefined") ShareManager.showToast("📝 Lyrics downloaded!");
+  }
+
+  // ── Share Song ─────────────────────────────
+  function shareSong() {
+    if (typeof ShareManager !== "undefined") {
+      ShareManager.shareNative("song", window.currentClassNum, window.currentSubject, window.currentChapter);
+    }
+  }
+
+  // ── Bind download/share buttons ────────────
+  function bindActionBtns() {
+    const dlBtn = document.getElementById("music-dl-btn");
+    const dlLyricsBtn = document.getElementById("music-dl-lyrics-btn");
+    const shareBtn = document.getElementById("music-share-btn");
+    if (dlBtn) dlBtn.addEventListener("click", downloadMp3);
+    if (dlLyricsBtn) dlLyricsBtn.addEventListener("click", downloadLyrics);
+    if (shareBtn) shareBtn.addEventListener("click", shareSong);
+  }
+
+  return { init, show, hide, bindActionBtns };
 })();
 
-document.addEventListener("DOMContentLoaded", () => MusicPlayer.init());
+document.addEventListener("DOMContentLoaded", () => { MusicPlayer.init(); MusicPlayer.bindActionBtns(); });

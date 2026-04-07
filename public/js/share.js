@@ -26,6 +26,16 @@ const ShareManager = (() => {
           text: `🧠 Memorising ${chapter} (Class ${classNum}) using AI flashcards on NotesGPT. Free for all CBSE students!\n${base}`,
           url: base,
         };
+      case "song":
+        return {
+          text: `🎵 Just created an AI memory song for *${chapter}* (Class ${classNum} ${subject}) on NotesGPT!\n\nStudy with catchy songs that help you memorise any topic 🎶\n${base}`,
+          url: base,
+        };
+      case "aivideo":
+        return {
+          text: `🎬 Just watched an AI-generated visual lesson for *${chapter}* (Class ${classNum} ${subject}) on NotesGPT!\n\nGet cinematic video explanations for every CBSE chapter — free!\n${base}`,
+          url: base,
+        };
       default:
         return {
           text: `📖 Free AI CBSE study notes for Class 6-12! Notes, flashcards, tests & more.\n${base}`,
