@@ -59,6 +59,18 @@ app.use(express.static(path.join(__dirname, "public"), {
   },
 }));
 
+// ── Digital Asset Links for Android TWA ─────────────────────
+app.get("/.well-known/assetlinks.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.json([{
+    relation: ["delegate_permission/common.handle_all_urls"],
+    target: {
+      namespace: "android_app",
+      package_name: "online.notesgpt.app",
+      sha256_cert_fingerprints: [process.env.TWA_SHA256 || "PLACEHOLDER"]
+    }
+  }]);
+});
 
 // ── Free models to try (fastest first) ──────────────────────
 // Note: Free tier = 50 req/day. Add $10 credits on OpenRouter for 1000/day.
