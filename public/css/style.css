@@ -3428,7 +3428,7 @@ body {
 @media (max-width: 768px) {
   /* Base */
   html { font-size: 15px; }
-  .container { padding: 28px 16px 40px; }
+  .container { padding: 80px 16px 40px; }
   .landing { padding: 32px 16px 48px; }
 
   /* Hero */
@@ -3551,7 +3551,7 @@ body {
 /* ── Mobile Portrait (≤480px) ─────────────── */
 @media (max-width: 480px) {
   html { font-size: 14px; }
-  .container { padding: 20px 14px 32px; }
+  .container { padding: 80px 14px 32px; }
   .landing { padding: 24px 14px 36px; }
 
   /* Hero */
