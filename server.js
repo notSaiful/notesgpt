@@ -63,11 +63,11 @@ app.use(express.static(path.join(__dirname, "public"), {
 // ── Free models to try (best quality + speed first) ─────────
 // Note: Free tier = 50 req/day. Add $10 credits on OpenRouter for 1000/day.
 const FREE_MODELS = [
-  "z-ai/glm-4.5-air:free",
-  "qwen/qwen3.6-plus:free",
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "stepfun/step-3.5-flash:free",
-  "arcee-ai/trinity-large-preview:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",   // 0.65s — 80B MoE, best quality+speed
+  "google/gemma-3n-e4b-it:free",              // 0.43s — ultra-fast fallback
+  "google/gemma-3-12b-it:free",               // 0.80s — solid quality
+  "nvidia/nemotron-nano-9b-v2:free",           // 1.25s — reliable
+  "meta-llama/llama-3.2-3b-instruct:free",    // 0.97s — last resort
 ];
 
 // ── Subject mapping per class ────────────────────────────────
