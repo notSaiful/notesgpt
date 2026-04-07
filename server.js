@@ -60,18 +60,23 @@ app.use(express.static(path.join(__dirname, "public"), {
 }));
 
 
-// ── Free models to try (best quality + speed first) ─────────
+// ── Free models to try (fastest first) ──────────────────────
 // Note: Free tier = 50 req/day. Add $10 credits on OpenRouter for 1000/day.
 const FREE_MODELS = [
-  "qwen/qwen3-next-80b-a3b-instruct:free",   // 0.65s — 80B MoE, best quality+speed
-  "google/gemma-3n-e4b-it:free",              // 0.43s — ultra-fast fallback
+  "google/gemma-3-4b-it:free",                // 0.41s — fastest, good quality
+  "google/gemma-3n-e4b-it:free",              // 0.74s — ultra-fast
+  "qwen/qwen3-next-80b-a3b-instruct:free",   // 0.98s — best quality MoE
+  "meta-llama/llama-3.2-3b-instruct:free",    // 1.01s — reliable fallback
   "google/gemma-3-12b-it:free",               // 0.80s — solid quality
-  "nvidia/nemotron-nano-9b-v2:free",           // 1.25s — reliable
-  "meta-llama/llama-3.2-3b-instruct:free",    // 0.97s — last resort
 ];
 
 // ── Subject mapping per class ────────────────────────────────
 const SUBJECTS_BY_CLASS = {
+  "1":  ["Maths", "English", "Hindi", "EVS"],
+  "2":  ["Maths", "English", "Hindi", "EVS"],
+  "3":  ["Maths", "English", "Hindi", "EVS", "Computer"],
+  "4":  ["Maths", "English", "Hindi", "EVS", "Computer"],
+  "5":  ["Maths", "English", "Hindi", "EVS", "Computer"],
   "6":  ["Maths", "Science", "Social Science", "English", "Hindi"],
   "7":  ["Maths", "Science", "Social Science", "English", "Hindi"],
   "8":  ["Maths", "Science", "Social Science", "English", "Hindi"],
@@ -673,7 +678,7 @@ app.post("/api/generate-questions", async (req, res) => {
 
     const systemMsg = "You are a CBSE exam paper setter. Generate exam-style questions as a valid JSON array. Output ONLY the JSON array, no other text.";
     const prompt = buildQuestionPrompt(classNum, subject, chapter.trim());
-    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 8000);
+    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 4000);
 
     if (!raw) {
       return res.status(502).json({ error: "All AI models are temporarily busy. Please try again in a minute." });
@@ -727,7 +732,7 @@ app.post("/api/generate-test", async (req, res) => {
 
     const systemMsg = "You are a CBSE exam paper setter. Generate a test as a valid JSON array. Output ONLY the JSON array, no other text.";
     const prompt = buildTestPrompt(classNum, subject, chapter.trim());
-    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 8000);
+    const raw = await callOpenRouter(apiKey, systemMsg, prompt, 4000);
 
     if (!raw) {
       return res.status(502).json({ error: "All AI models are temporarily busy. Please try again in a minute." });
