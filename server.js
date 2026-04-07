@@ -1146,25 +1146,46 @@ app.post("/api/solve-doubt", async (req, res) => {
 
     const moreDetail = followUp ? "\n\nThe student is still confused. Give a MORE DETAILED explanation with a DIFFERENT EXAMPLE. Be extra simple." : "";
 
-    const systemMsg = "You are a friendly CBSE teacher. Explain doubts clearly and concisely. Keep responses exam-focused and structured.";
+    // ── Enhanced system prompt with action detection ──
+    const systemMsg = `You are NotesGPT AI — a powerful CBSE study assistant. You can:
+1. Answer doubts clearly
+2. Detect when the student wants a specific feature and respond accordingly
+
+IMPORTANT — INTENT DETECTION:
+If the student asks for ANY of these, you MUST include the action tag at the VERY END of your response:
+
+- Song/memory song/jingle/rap/melody → add: [ACTION:SONG]
+- Flashcards/flash cards/revision cards → add: [ACTION:FLASHCARDS]
+- Mind map/concept map/visual map → add: [ACTION:MINDMAP]
+- Audiobook/audio lesson/read aloud → add: [ACTION:AUDIOBOOK]
+- Video/visual lesson/animation/AI video → add: [ACTION:VIDEO]
+- Notes/summary/chapter notes → add: [ACTION:NOTES]
+- Practice questions/MCQs/quiz → add: [ACTION:PRACTICE]
+- Mock test/full test/exam paper → add: [ACTION:TEST]
+
+Examples:
+- "Make a song about periodic table" → explain + [ACTION:SONG]
+- "Generate flashcards for photosynthesis" → explain + [ACTION:FLASHCARDS]
+- "Create a mind map of Indian constitution" → explain + [ACTION:MINDMAP]
+- "I want an audiobook for this chapter" → explain + [ACTION:AUDIOBOOK]
+
+If the student is just asking a normal doubt, do NOT add any action tag. Just answer the doubt.`;
+
     const prompt = `You are helping a CBSE Class ${classNum || 10} student.
 
 Subject: ${subject || "General"}
 Chapter: ${chapter || "General"}
 
-Student's doubt:
+Student's request:
 "${question.trim()}"
 
 ${focusHint}${moreDetail}
 
 Instructions:
-- Explain in simple, clear language appropriate for Class ${classNum || 10}
-- Keep it exam-focused (CBSE style)
-- Use step-by-step explanation if needed
-- Include a short example if helpful
-- Highlight the key concept
+- If this is a GENERATION REQUEST (song, flashcards, mind map, audiobook, video, notes, practice, test), write a short friendly confirmation message (1-2 sentences) about what you're about to generate, then add the appropriate [ACTION:XXX] tag at the very end.
+- If this is a DOUBT/QUESTION, explain clearly in simple language appropriate for Class ${classNum || 10}. Keep it exam-focused (CBSE style). Use step-by-step explanation if needed. Include a short example if helpful. Highlight the key concept.
 
-Format your response as:
+For doubts, format your response as:
 
 📌 EXPLANATION:
 [Clear explanation]
@@ -1186,8 +1207,18 @@ Keep it SHORT and structured. Skip any section that isn't relevant.`;
       return res.status(502).json({ error: "AI temporarily busy. Try again." });
     }
 
-    console.log(`💡 Doubt solved for Class ${classNum} ${subject}`);
-    return res.json({ answer: raw.trim() });
+    // ── Parse action tags from response ──
+    const actionMatch = raw.match(/\[ACTION:(SONG|FLASHCARDS|MINDMAP|AUDIOBOOK|VIDEO|NOTES|PRACTICE|TEST)\]/i);
+    let action = null;
+    let cleanAnswer = raw.trim();
+
+    if (actionMatch) {
+      action = actionMatch[1].toUpperCase();
+      cleanAnswer = cleanAnswer.replace(/\[ACTION:\w+\]/gi, "").trim();
+    }
+
+    console.log(`💡 Doubt solved for Class ${classNum} ${subject}${action ? ` → ACTION: ${action}` : ""}`);
+    return res.json({ answer: cleanAnswer, action });
   } catch (err) {
     console.error("Server error:", err);
     return res.status(500).json({ error: "An unexpected error occurred." });
