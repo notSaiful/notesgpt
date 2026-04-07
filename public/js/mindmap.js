@@ -88,7 +88,7 @@ const MindMap = (() => {
     const subH = 26;
     const subGap = 8;
     const branchGap = 28;
-    const centerGap = 200;
+    const centerGap = 220; // Increased spacing for curves
 
     // Split nodes into left and right halves
     const midIdx = Math.ceil(count / 2);
@@ -108,50 +108,80 @@ const MindMap = (() => {
     const rightH = calcSideH(rightNodes);
     const maxH = Math.max(leftH, rightH, 400);
 
-    const W = 1100;
-    const H = maxH + 120;
+    const W = 1200;
+    const H = maxH + 140;
     const cx = W / 2;
     const cy = H / 2;
 
     // Center node dimensions
-    const centerW = 220;
-    const centerH = 56;
+    const centerW = 240;
+    const centerH = 64;
 
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" class="mm-svg">`;
 
-    // Defs: filters for glow
+    // ── CSS Animations for SVG ─────────────────
+    svg += `<style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap');
+      .mm-svg { font-family: 'Space Grotesk', sans-serif; }
+      @keyframes drawPath { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+      @keyframes drawSubPath { from { stroke-dashoffset: 500; } to { stroke-dashoffset: 0; } }
+      @keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+      @keyframes pulseGlow { 0%, 100% { filter: drop-shadow(0 0 10px rgba(139,92,246,0.4)); } 50% { filter: drop-shadow(0 0 20px rgba(139,92,246,0.8)); } }
+      .anim-path { stroke-dasharray: 2000; animation: drawPath 1.5s ease-out forwards; }
+      .anim-subpath { stroke-dasharray: 500; stroke-dashoffset: 500; animation: drawSubPath 1s ease-out forwards 0.8s; }
+      .center-grp { animation: floatY 4s ease-in-out infinite, pulseGlow 3s ease-in-out infinite; transform-origin: center; }
+      .node-grp { animation: floatY 4.5s ease-in-out infinite; }
+    </style>`;
+
+    // Defs: filters and gradients
     svg += `<defs>`;
     PALETTE.forEach((c, i) => {
       svg += `<filter id="glow${i}" x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur stdDeviation="6" result="blur"/>
+        <feGaussianBlur stdDeviation="5" result="blur"/>
         <feFlood flood-color="${c.glow}" result="color"/>
         <feComposite in="color" in2="blur" operator="in"/>
         <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>`;
+      svg += `<linearGradient id="grad${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${c.bg}" stop-opacity="0.9"/>
+        <stop offset="100%" stop-color="#0a0a1a" stop-opacity="0.9"/>
+      </linearGradient>`;
     });
-    // Center glow
-    svg += `<filter id="glowCenter" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
-      <feFlood flood-color="rgba(139,92,246,0.4)" result="color"/>
+    
+    // Center glow & grad
+    svg += `<filter id="glowCenter" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feFlood flood-color="rgba(139,92,246,0.6)" result="color"/>
       <feComposite in="color" in2="blur" operator="in"/>
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`;
+    svg += `<linearGradient id="centerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b0764"/>
+      <stop offset="100%" stop-color="#1e0a3c"/>
+    </linearGradient>`;
+
+    // BG Radial
+    svg += `<radialGradient id="bgRadial" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0e0a1a"/>
+      <stop offset="100%" stop-color="#030108"/>
+    </radialGradient>`;
+
+    // Dot pattern
+    svg += `<pattern id="dots" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="rgba(255,255,255,0.04)" />
+    </pattern>`;
+
     svg += `</defs>`;
 
-    // Background
-    svg += `<rect width="${W}" height="${H}" fill="#08081a" rx="16"/>`;
-
-    // Subtle grid pattern
-    for (let gx = 0; gx < W; gx += 40) {
-      svg += `<line x1="${gx}" y1="0" x2="${gx}" y2="${H}" stroke="rgba(255,255,255,0.015)" stroke-width="1"/>`;
-    }
-    for (let gy = 0; gy < H; gy += 40) {
-      svg += `<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="rgba(255,255,255,0.015)" stroke-width="1"/>`;
-    }
+    // Background Layer
+    svg += `<rect width="${W}" height="${H}" fill="url(#bgRadial)" rx="24"/>`;
+    svg += `<rect width="${W}" height="${H}" fill="url(#dots)" rx="24"/>`;
 
     // ── Draw center node ─────────────────────
-    svg += `<rect x="${cx - centerW/2}" y="${cy - centerH/2}" width="${centerW}" height="${centerH}" rx="28" fill="#1a103d" stroke="#8b5cf6" stroke-width="2.5" filter="url(#glowCenter)"/>`;
-    svg += centerText(data.title, cx, cy, 14, "#fff", 800, centerW - 20);
+    svg += `<g class="center-grp">`;
+    svg += `<rect x="${cx - centerW/2}" y="${cy - centerH/2}" width="${centerW}" height="${centerH}" rx="32" fill="url(#centerGrad)" stroke="#a78bfa" stroke-width="2.5" filter="url(#glowCenter)"/>`;
+    svg += centerText(data.title, cx, cy, 15, "#fff", 800, centerW - 30);
+    svg += `</g>`;
 
     // ── Draw left branches ───────────────────
     let yPos = cy - leftH / 2 + 30;
@@ -162,36 +192,42 @@ const MindMap = (() => {
         w.toLowerCase().includes(node.topic.toLowerCase())
       );
       const nodeColor = isWeak ? "#ef4444" : palette.border;
-      const nodeBg = isWeak ? "#3b1111" : palette.bg;
+      const nodeBg = isWeak ? "#3b1111" : `url(#grad${i % PALETTE.length})`;
       const nodeGlow = isWeak ? "none" : `url(#glow${i % PALETTE.length})`;
 
       const nx = cx - centerGap - nodeW / 2;
       const ny = yPos;
 
-      // Connection: curved line from center to node
-      const midX = cx - centerGap / 2;
-      svg += `<path d="M ${cx - centerW/2} ${cy} C ${midX} ${cy}, ${midX} ${ny + nodeH/2}, ${nx + nodeW} ${ny + nodeH/2}" fill="none" stroke="${nodeColor}" stroke-width="2" opacity="0.5"/>`;
+      // Group for animation
+      svg += `<g class="node-grp" style="animation-delay: ${Math.random()*0.5}s">`;
+
+      // Connection: curved line
+      const midX = cx - centerGap / 1.5;
+      svg += `<path d="M ${cx - centerW/2 + 10} ${cy} C ${midX} ${cy}, ${midX} ${ny + nodeH/2}, ${nx + nodeW} ${ny + nodeH/2}" fill="none" stroke="${nodeColor}" stroke-width="2.5" stroke-opacity="0.4" class="anim-path"/>`;
 
       // Node rectangle
       svg += `<rect x="${nx}" y="${ny}" width="${nodeW}" height="${nodeH}" rx="12" fill="${nodeBg}" stroke="${nodeColor}" stroke-width="${isWeak ? 2.5 : 1.5}" filter="${nodeGlow}"/>`;
+      
+      // Node text + indicator
       if (isWeak) {
-        svg += `<circle cx="${nx + 14}" cy="${ny + nodeH/2}" r="4" fill="#ef4444"/>`;
+        svg += `<circle cx="${nx + 14}" cy="${ny + nodeH/2}" r="5" fill="#ef4444"/>`;
       }
-      svg += `<text x="${nx + (isWeak ? 26 : 14)}" y="${ny + nodeH/2 + 5}" font-size="11.5" fill="#fff" font-weight="700" font-family="Inter,sans-serif">${esc(truncate(node.topic, 20))}</text>`;
+      svg += `<text x="${nx + (isWeak ? 28 : 16)}" y="${ny + nodeH/2 + 5}" font-size="13" fill="#fff" font-weight="700">${esc(truncate(node.topic, 19))}</text>`;
 
       // Subtopics
       const subs = node.subtopics || [];
       subs.forEach((sub, si) => {
-        const sy = ny + nodeH + 6 + si * (subH + subGap);
-        const sx = nx - 20;
+        const sy = ny + nodeH + 8 + si * (subH + subGap);
+        const sx = nx - 10;
 
         // Connector line
-        svg += `<line x1="${nx}" y1="${ny + nodeH/2}" x2="${sx + subW}" y2="${sy + subH/2}" stroke="${nodeColor}" stroke-width="1" opacity="0.25" stroke-dasharray="3,3"/>`;
+        svg += `<path d="M ${nx + 15} ${ny + nodeH} V ${sy + subH/2} H ${sx + subW}" fill="none" stroke="${nodeColor}" stroke-width="1.5" stroke-opacity="0.3" class="anim-subpath"/>`;
 
         // Sub node
-        svg += `<rect x="${sx}" y="${sy}" width="${subW}" height="${subH}" rx="8" fill="rgba(255,255,255,0.03)" stroke="${nodeColor}" stroke-width="0.8" opacity="0.8"/>`;
-        svg += `<text x="${sx + 10}" y="${sy + subH/2 + 4}" font-size="9.5" fill="${palette.text}" font-family="Inter,sans-serif" font-weight="500" opacity="0.9">${esc(truncate(sub, 24))}</text>`;
+        svg += `<rect x="${sx}" y="${sy}" width="${subW}" height="${subH}" rx="8" fill="rgba(255,255,255,0.03)" stroke="${nodeColor}" stroke-width="0.8" stroke-opacity="0.6"/>`;
+        svg += `<text x="${sx + 10}" y="${sy + subH/2 + 4}" font-size="10.5" fill="${palette.text}" font-weight="500">${esc(truncate(sub, 22))}</text>`;
       });
+      svg += `</g>`;
 
       yPos += nodeH + subs.length * (subH + subGap) + branchGap;
     });
@@ -206,42 +242,49 @@ const MindMap = (() => {
         w.toLowerCase().includes(node.topic.toLowerCase())
       );
       const nodeColor = isWeak ? "#ef4444" : palette.border;
-      const nodeBg = isWeak ? "#3b1111" : palette.bg;
+      const nodeBg = isWeak ? "#3b1111" : `url(#grad${i % PALETTE.length})`;
       const nodeGlow = isWeak ? "none" : `url(#glow${i % PALETTE.length})`;
 
       const nx = cx + centerGap - nodeW / 2;
       const ny = yPos;
 
-      // Connection: curved line from center to node
-      const midX = cx + centerGap / 2;
-      svg += `<path d="M ${cx + centerW/2} ${cy} C ${midX} ${cy}, ${midX} ${ny + nodeH/2}, ${nx} ${ny + nodeH/2}" fill="none" stroke="${nodeColor}" stroke-width="2" opacity="0.5"/>`;
+      // Group
+      svg += `<g class="node-grp" style="animation-delay: ${Math.random()*0.5}s">`;
 
-      // Node rectangle
+      // Connection
+      const midX = cx + centerGap / 1.5;
+      svg += `<path d="M ${cx + centerW/2 - 10} ${cy} C ${midX} ${cy}, ${midX} ${ny + nodeH/2}, ${nx} ${ny + nodeH/2}" fill="none" stroke="${nodeColor}" stroke-width="2.5" stroke-opacity="0.4" class="anim-path"/>`;
+
+      // Node
       svg += `<rect x="${nx}" y="${ny}" width="${nodeW}" height="${nodeH}" rx="12" fill="${nodeBg}" stroke="${nodeColor}" stroke-width="${isWeak ? 2.5 : 1.5}" filter="${nodeGlow}"/>`;
       if (isWeak) {
-        svg += `<circle cx="${nx + 14}" cy="${ny + nodeH/2}" r="4" fill="#ef4444"/>`;
+        svg += `<circle cx="${nx + 14}" cy="${ny + nodeH/2}" r="5" fill="#ef4444"/>`;
       }
-      svg += `<text x="${nx + (isWeak ? 26 : 14)}" y="${ny + nodeH/2 + 5}" font-size="11.5" fill="#fff" font-weight="700" font-family="Inter,sans-serif">${esc(truncate(node.topic, 20))}</text>`;
+      svg += `<text x="${nx + (isWeak ? 28 : 16)}" y="${ny + nodeH/2 + 5}" font-size="13" fill="#fff" font-weight="700">${esc(truncate(node.topic, 19))}</text>`;
 
       // Subtopics
       const subs = node.subtopics || [];
       subs.forEach((sub, si) => {
-        const sy = ny + nodeH + 6 + si * (subH + subGap);
-        const sx = nx + nodeW + 20 - subW;
+        const sy = ny + nodeH + 8 + si * (subH + subGap);
+        const sx = nx + nodeW + 10 - subW;
 
         // Connector
-        svg += `<line x1="${nx + nodeW}" y1="${ny + nodeH/2}" x2="${sx}" y2="${sy + subH/2}" stroke="${nodeColor}" stroke-width="1" opacity="0.25" stroke-dasharray="3,3"/>`;
+        svg += `<path d="M ${nx + nodeW - 15} ${ny + nodeH} V ${sy + subH/2} H ${sx}" fill="none" stroke="${nodeColor}" stroke-width="1.5" stroke-opacity="0.3" class="anim-subpath"/>`;
 
         // Sub node
-        svg += `<rect x="${sx}" y="${sy}" width="${subW}" height="${subH}" rx="8" fill="rgba(255,255,255,0.03)" stroke="${nodeColor}" stroke-width="0.8" opacity="0.8"/>`;
-        svg += `<text x="${sx + 10}" y="${sy + subH/2 + 4}" font-size="9.5" fill="${palette.text}" font-family="Inter,sans-serif" font-weight="500" opacity="0.9">${esc(truncate(sub, 24))}</text>`;
+        svg += `<rect x="${sx}" y="${sy}" width="${subW}" height="${subH}" rx="8" fill="rgba(255,255,255,0.03)" stroke="${nodeColor}" stroke-width="0.8" stroke-opacity="0.6"/>`;
+        svg += `<text x="${sx + 10}" y="${sy + subH/2 + 4}" font-size="10.5" fill="${palette.text}" font-weight="500">${esc(truncate(sub, 22))}</text>`;
       });
+      svg += `</g>`;
 
       yPos += nodeH + subs.length * (subH + subGap) + branchGap;
     });
 
-    // Legend
-    svg += `<text x="20" y="${H - 16}" font-size="9" fill="rgba(255,255,255,0.3)" font-family="Inter,sans-serif">NotesGPT • CBSE Class ${window.currentClassNum || 10} • ${data.title}</text>`;
+    // Logo / Watermark
+    svg += `<g transform="translate(24, ${H - 24})" opacity="0.6">
+              <path d="M0,0 l8,-12 l8,12 Z" fill="#8b5cf6"/>
+              <text x="24" y="0" font-size="13" fill="#9ca3af" font-weight="700">StyleLearn AI • Class ${window.currentClassNum || 10}</text>
+            </g>`;
 
     svg += `</svg>`;
     els.canvas.innerHTML = svg;
@@ -251,14 +294,14 @@ const MindMap = (() => {
   function centerText(text, x, y, size, fill, weight, maxW) {
     const words = text.split(" ");
     if (text.length * size * 0.55 < maxW) {
-      return `<text x="${x}" y="${y + size * 0.35}" text-anchor="middle" font-size="${size}" fill="${fill}" font-weight="${weight}" font-family="Inter,sans-serif">${esc(text)}</text>`;
+      return `<text x="${x}" y="${y + size * 0.35}" text-anchor="middle" font-size="${size}" fill="${fill}" font-weight="${weight}">${esc(text)}</text>`;
     }
     const mid = Math.ceil(words.length / 2);
     const l1 = words.slice(0, mid).join(" ");
     const l2 = words.slice(mid).join(" ");
     return `
-      <text x="${x}" y="${y - size * 0.35}" text-anchor="middle" font-size="${size}" fill="${fill}" font-weight="${weight}" font-family="Inter,sans-serif">${esc(l1)}</text>
-      <text x="${x}" y="${y + size * 0.85}" text-anchor="middle" font-size="${size}" fill="${fill}" font-weight="${weight}" font-family="Inter,sans-serif">${esc(l2)}</text>`;
+      <text x="${x}" y="${y - size * 0.35}" text-anchor="middle" font-size="${size}" fill="${fill}" font-weight="${weight}">${esc(l1)}</text>
+      <text x="${x}" y="${y + size * 0.85}" text-anchor="middle" font-size="${size}" fill="${fill}" font-weight="${weight}">${esc(l2)}</text>`;
   }
 
   function truncate(t, max) { return t.length > max ? t.slice(0, max - 1) + "…" : t; }
